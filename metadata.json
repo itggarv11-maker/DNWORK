@@ -1,0 +1,9 @@
+{
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "name": "*no edit * FULLY WORKING STUBRO",
+  "description": "",
+  "prompt": ""
+}
