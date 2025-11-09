@@ -146,22 +146,21 @@
           animation: ken-burns 15s ease-in-out alternate-reverse infinite;
       }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@^1.11.0",
-    "react/": "https://esm.sh/react@^19.1.0/",
-    "react": "https://esm.sh/react@^19.1.0",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.7.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
-    "reactflow": "https://esm.sh/reactflow@^11.11.4",
-    "jspdf": "https://esm.sh/jspdf@^3.0.1",
-    "firebase/app": "https://esm.sh/firebase@10.12.3/app",
-    "firebase/auth": "https://esm.sh/firebase@10.12.3/auth",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^4.7.0",
-    "vite": "https://esm.sh/vite@^7.0.6",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "vite": "https://aistudiocdn.com/vite@^7.2.2",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.5",
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0",
+    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
+    "reactflow": "https://aistudiocdn.com/reactflow@^11.11.4",
     "pdfjs-dist": "https://aistudiocdn.com/pdfjs-dist@^5.4.394",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.5.0/",
     "mammoth": "https://aistudiocdn.com/mammoth@^1.11.0"
   }
 }
@@ -169,13 +168,6 @@
 </head>
   <body class="bg-gradient-to-br from-sky-50 via-violet-50 to-pink-50 text-slate-800 antialiased">
     <div id="root"></div>
-    <script>
-      // Polyfill `process` for browser environments. This is required for the
-      // geminiService to not crash when checking for `process.env.API_KEY`.
-      if (typeof process === 'undefined') {
-        window.process = { env: {} };
-      }
-    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

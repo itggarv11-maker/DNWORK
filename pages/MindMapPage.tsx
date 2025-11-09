@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { MindMapNode } from '../types';
 import * as geminiService from '../services/geminiService';
 import Card from '../components/common/Card';

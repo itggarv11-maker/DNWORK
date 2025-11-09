@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../components/common/Card';
@@ -144,5 +145,4 @@ const AILabAssistantPage: React.FC = () => {
     ) : experiment ? renderExperiment() : renderForm();
 };
 
-// FIX: Added default export
 export default AILabAssistantPage;

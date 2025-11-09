@@ -429,5 +429,4 @@ const LiveDebatePage: React.FC = () => {
     }
 };
 
-// FIX: Added default export to resolve module loading errors.
 export default LiveDebatePage;

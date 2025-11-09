@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -9,8 +10,7 @@ import Spinner from '../components/common/Spinner';
 import { DownloadIcon } from '../components/icons/DownloadIcon';
 import { CameraIcon } from '../components/icons/CameraIcon';
 import { useContent } from '../contexts/ContentContext';
-// FIX: Changed import path to use esm.sh for react-router-dom consistency.
-import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRightIcon } from '../components/icons/ArrowRightIcon';
 import { CheckCircleIcon } from '../components/icons/CheckCircleIcon';
 import { XCircleIcon } from '../components/icons/XCircleIcon';

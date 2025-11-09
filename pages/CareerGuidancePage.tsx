@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Link } from 'https://esm.sh/react-router-dom';
+import { Link } from 'react-router-dom';
 import { CareerInfo, CareerPath, CareerStep } from '../types';
 import * as geminiService from '../services/geminiService';
 import Card from '../components/common/Card';
