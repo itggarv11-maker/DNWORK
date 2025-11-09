@@ -1,6 +1,5 @@
-
 import React, { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import { StudyPlan, StudyDay } from '../types';
 import * as geminiService from '../services/geminiService';
 import Card from '../components/common/Card';

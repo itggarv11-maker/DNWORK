@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import { QuizQuestion, WrittenFeedback, QuizHistoryItem, Subject } from '../../types';
 import * as geminiService from '../../services/geminiService';
 import * as ttsService from '../../services/ttsService';

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -10,7 +9,8 @@ import Spinner from '../components/common/Spinner';
 import { DownloadIcon } from '../components/icons/DownloadIcon';
 import { CameraIcon } from '../components/icons/CameraIcon';
 import { useContent } from '../contexts/ContentContext';
-import { useNavigate, Link } from 'react-router-dom';
+// FIX: Changed import path to use esm.sh for react-router-dom consistency.
+import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
 import { ArrowRightIcon } from '../components/icons/ArrowRightIcon';
 import { CheckCircleIcon } from '../components/icons/CheckCircleIcon';
 import { XCircleIcon } from '../components/icons/XCircleIcon';
@@ -364,9 +364,7 @@ const QuestionPaperPage: React.FC = () => {
                                 
                                 <div className="bg-slate-100 p-3 rounded-md border border-slate-200 text-sm">
                                     <p className="font-semibold text-slate-600">Your Transcribed Answer:</p>
-                                    <div className="italic text-slate-800">
-                                        &quot;<MathRenderer text={gradedQ.studentAnswerTranscription || ''} />&quot;
-                                    </div>
+                                    <div className="italic text-slate-800">"<MathRenderer text={gradedQ.studentAnswerTranscription || ''}" />"</div>
                                 </div>
     
                                 <div className="bg-indigo-50 p-3 rounded-md border border-indigo-100 mt-2 text-sm space-y-2">

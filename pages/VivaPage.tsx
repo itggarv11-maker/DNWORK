@@ -1,5 +1,7 @@
+
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import { ClassLevel, VivaQuestion } from '../types';
 import { CLASS_LEVELS } from '../constants';
 import * as geminiService from '../services/geminiService';

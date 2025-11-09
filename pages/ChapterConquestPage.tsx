@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
 import { GameLevel, PlayerPosition, Interaction } from '../types';
 import * as geminiService from '../services/geminiService';
 import { useContent } from '../contexts/ContentContext';
@@ -242,34 +242,28 @@ const ChapterConquestPage: React.FC = () => {
 
             {(gameState === 'interaction' || gameState === 'feedback') && activeInteraction && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <Card variant="light" className="w-full max-w-lg">
-                        {gameState === 'interaction' ? (
-                            <>
-                                <h2 className="text-xl font-bold text-slate-800 text-center">{activeInteraction.prompt}</h2>
-                                <div className="my-4">
-                                    <input
-                                        type="text"
-                                        value={interactionAnswer}
-                                        onChange={e => setInteractionAnswer(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleInteractionSubmit()}
-                                        className="w-full p-2 border border-slate-300 rounded-md"
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="text-center">
-                                    <Button onClick={handleInteractionSubmit}>Submit Answer</Button>
-                                </div>
-                            </>
+                    <Card variant="light" className="max-w-lg w-full">
+                        {feedback ? (
+                            <div className="text-center">
+                                <h2 className={`text-2xl font-bold ${feedback.correct ? 'text-green-600' : 'text-red-600'}`}>{feedback.correct ? 'Success!' : 'Try Again!'}</h2>
+                                <p className="text-slate-600 mt-2">{feedback.message}</p>
+                                <Button onClick={closeFeedback} className="mt-4">Continue</Button>
+                            </div>
                         ) : (
-                             feedback && (
-                                <div className="text-center">
-                                    <h2 className={`text-2xl font-bold ${feedback.correct ? 'text-green-600' : 'text-red-600'}`}>
-                                        {feedback.correct ? 'Correct!' : 'Not Quite!'}
-                                    </h2>
-                                    <p className="mt-2 text-slate-700">{feedback.message}</p>
-                                    <Button onClick={closeFeedback} className="mt-4">Continue</Button>
+                            <form onSubmit={(e) => { e.preventDefault(); handleInteractionSubmit(); }}>
+                                <h2 className="text-xl font-bold text-slate-800 mb-4">{activeInteraction.prompt}</h2>
+                                <textarea
+                                    value={interactionAnswer}
+                                    onChange={e => setInteractionAnswer(e.target.value)}
+                                    rows={3}
+                                    className="w-full p-2 border border-slate-300 rounded-md"
+                                    autoFocus
+                                />
+                                <div className="mt-4 flex justify-end gap-2">
+                                    <Button type="button" variant="outline" onClick={closeFeedback}>Cancel</Button>
+                                    <Button type="submit">Submit</Button>
                                 </div>
-                            )
+                            </form>
                         )}
                     </Card>
                 </div>

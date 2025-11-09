@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import { Chat } from '@google/genai';
 import * as geminiService from '../services/geminiService';
-import * as ttsService from '../services/ttsService';
+import * as ttsService from '../../services/ttsService';
 import { DebateTurn, DebateScorecard } from '../types';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
@@ -357,77 +357,99 @@ const LiveDebatePage: React.FC = () => {
                     {recordedAudioBlob && !isRecording && (
                         <div className="p-2 bg-slate-100 rounded-lg flex items-center gap-2">
                             <p className="text-sm font-medium text-slate-700 flex-grow">Your recorded argument is ready to send.</p>
-                            <audio src={URL.createObjectURL(recordedAudioBlob)} controls className="h-8" />
-                            <button onClick={() => setRecordedAudioBlob(null)} className="text-red-500 hover:text-red-700 font-bold">&times;</button>
+                            <audio src={URL.createObjectURL(recordedAudioBlob)} controls className="h-8"/>
+                            <button onClick={() => setRecordedAudioBlob(null)} className="text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
                         </div>
                     )}
                     <div className="flex items-center gap-2">
-                         <button onClick={isRecording ? stopRecording : startRecording} disabled={isAiThinking} className={`p-3 rounded-full transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>
-                            {isRecording ? <StopIcon className="w-6 h-6"/> : <MicrophoneIcon className="w-6 h-6" />}
-                        </button>
-                        <input type="text" value={userInput} onChange={e => setUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmitArgument()} placeholder="Type your argument or record it..." className="w-full p-3 bg-white border border-slate-300 rounded-lg"/>
-                        <Button onClick={handleSubmitArgument} disabled={isAiThinking || (!userInput.trim() && !recordedAudioBlob)} className="h-12 w-12 p-0 flex-shrink-0">
-                            <PaperAirplaneIcon className="w-6 h-6" />
+                        <input
+                            type="text"
+                            value={userInput}
+                            onChange={(e) => { setUserInput(e.target.value); setRecordedAudioBlob(null); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmitArgument(); } }}
+                            placeholder={isAiThinking ? "Critico is thinking..." : "Type or record your argument..."}
+                            className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-violet-500 focus:border-violet-500 text-slate-900"
+                            disabled={isAiThinking || isRecording}
+                        />
+                        <Button onClick={isRecording ? stopRecording : startRecording} variant="ghost" className={isRecording ? '!text-red-500 animate-pulse' : '!text-slate-600'} disabled={isAiThinking}>
+                            {isRecording ? <StopIcon className="w-6 h-6"/> : <MicrophoneIcon className="w-6 h-6"/>}
+                        </Button>
+                        <Button onClick={handleSubmitArgument} disabled={isAiThinking || isRecording || (!userInput.trim() && !recordedAudioBlob)}>
+                            <PaperAirplaneIcon className="w-6 h-6"/>
                         </Button>
                     </div>
                 </div>
             </div>
         </Card>
     );
-
-    const renderEvaluating = () => (
+    
+    const renderLoading = (message: string) => (
         <Card variant="light" className="max-w-md mx-auto text-center">
             <Spinner className="w-16 h-16" colorClass="bg-violet-600"/>
-            <h2 className="text-2xl font-bold text-slate-800 mt-6">{loadingMessage}</h2>
-            <p className="text-slate-600 mt-2">Please wait a moment.</p>
+            <h2 className="text-2xl font-bold text-slate-800 mt-6">{message}</h2>
         </Card>
     );
+
+    const renderResults = () => {
+        if (!scorecard) return null;
+        const scoreColor = scorecard.overallScore > 75 ? 'text-green-600' : scorecard.overallScore > 50 ? 'text-amber-600' : 'text-red-600';
+
+        return (
+            <Card variant="light" className="max-w-4xl mx-auto">
+                <div className="text-center border-b border-slate-300 pb-4">
+                    <h1 className="text-3xl font-bold text-slate-800">Debate Evaluation</h1>
+                    <p className={`text-4xl font-extrabold mt-2 ${scoreColor}`}>{scorecard.overallScore}<span className="text-2xl text-slate-500">/100</span></p>
+                    <p className="font-semibold text-slate-600 mt-2">{scorecard.concludingRemarks}</p>
+                </div>
+                <div className="grid md:grid-cols-2 gap-8 mt-6">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-4">Performance Metrics</h3>
+                        <div className="space-y-3">
+                            <ScoreBar label="Argument Strength" score={scorecard.argumentStrength} />
+                            <ScoreBar label="Rebuttal Effectiveness" score={scorecard.rebuttalEffectiveness} />
+                            <ScoreBar label="Clarity & Articulation" score={scorecard.clarity} />
+                        </div>
+                    </div>
+                    <div className="space-y-6">
+                        <div>
+                            <h3 className="font-bold text-green-700">Your Strongest Argument:</h3>
+                            <p className="text-sm p-3 bg-green-100/70 border border-green-200 rounded-md mt-2 italic">"{scorecard.strongestArgument}"</p>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-amber-700">Suggestion for Improvement:</h3>
+                            <p className="text-sm p-3 bg-amber-100/70 border border-amber-200 rounded-md mt-2">{scorecard.improvementSuggestion}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="text-center mt-8">
+                     <Button onClick={() => { setStep('setup'); setDebateHistory([]); setTopic(''); }} variant="outline">Start a New Debate</Button>
+                </div>
+            </Card>
+        );
+    };
     
-    const renderResults = () => (
-        <Card variant="light" className="max-w-3xl mx-auto">
-            <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-800">Debate Evaluation</h1>
-                <p className="text-lg text-slate-600 mt-2">Overall Score: <span className="font-bold text-violet-700">{scorecard?.overallScore}/100</span></p>
-            </div>
-            <div className="mt-6 grid md:grid-cols-3 gap-4 text-center">
-                <div className="p-4 bg-slate-100/50 rounded-lg border border-slate-200">
-                    <p className="text-sm font-semibold text-slate-500">Argument Strength</p>
-                    <p className="text-2xl font-bold text-slate-800">{scorecard?.argumentStrength}/100</p>
+    const ScoreBar = ({ label, score }: { label: string, score: number}) => {
+        const bgColor = score > 75 ? 'bg-green-500' : score > 50 ? 'bg-amber-500' : 'bg-red-500';
+        return (
+            <div>
+                <div className="flex justify-between text-sm font-medium text-slate-600 mb-1">
+                    <span>{label}</span>
+                    <span>{score}/100</span>
                 </div>
-                <div className="p-4 bg-slate-100/50 rounded-lg border border-slate-200">
-                    <p className="text-sm font-semibold text-slate-500">Rebuttal Effectiveness</p>
-                    <p className="text-2xl font-bold text-slate-800">{scorecard?.rebuttalEffectiveness}/100</p>
-                </div>
-                <div className="p-4 bg-slate-100/50 rounded-lg border border-slate-200">
-                    <p className="text-sm font-semibold text-slate-500">Clarity</p>
-                    <p className="text-2xl font-bold text-slate-800">{scorecard?.clarity}/100</p>
+                <div className="w-full bg-slate-200 rounded-full h-2.5">
+                    <div className={`h-2.5 rounded-full ${bgColor}`} style={{ width: `${score}%` }}></div>
                 </div>
             </div>
-            <div className="mt-6 space-y-4 text-sm">
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <p className="font-bold text-green-800">Strongest Argument:</p>
-                    <p className="text-green-700 italic">"{scorecard?.strongestArgument}"</p>
-                </div>
-                 <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="font-bold text-amber-800">Suggestion for Improvement:</p>
-                    <p className="text-amber-700">{scorecard?.improvementSuggestion}</p>
-                </div>
-            </div>
-            <p className="text-center text-slate-700 mt-4 font-semibold">{scorecard?.concludingRemarks}</p>
-            <div className="text-center mt-6">
-                <Button onClick={() => setStep('setup')}>Start a New Debate</Button>
-            </div>
-        </Card>
-    );
+        )
+    };
 
     switch(step) {
         case 'setup': return renderSetup();
         case 'debating': return renderDebating();
-        case 'evaluating': return renderEvaluating();
+        case 'evaluating': return renderLoading(loadingMessage);
         case 'results': return renderResults();
         default: return renderSetup();
     }
 };
 
-// FIX: Added default export to resolve module loading errors.
 export default LiveDebatePage;

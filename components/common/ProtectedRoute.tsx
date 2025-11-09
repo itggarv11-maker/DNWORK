@@ -1,9 +1,10 @@
 
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'https://esm.sh/react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProtectedRouteProps {
+  // FIX: Replaced JSX.Element with React.ReactElement to resolve namespace error.
   children: React.ReactElement;
 }
 

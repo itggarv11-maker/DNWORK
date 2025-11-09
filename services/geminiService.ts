@@ -1,6 +1,3 @@
-
-
-
 import { GoogleGenAI, Type, Chat, GenerateContentResponse, GenerateImagesResponse } from "@google/genai";
 import { 
     QuizQuestion, Subject, ClassLevel, WrittenFeedback, QuestionPaper, GradedPaper, 
@@ -12,15 +9,14 @@ import {
 } from "../types";
 import { auth as firebaseAuth } from "./firebase";
 
-// FIX: Refactored getAiInstance to align with provided guidelines.
-// It now exclusively uses process.env.API_KEY for initialization.
-// This removes the dependency on import.meta.env, fixing the TypeScript error,
-// and also removes the logic for user-provided custom API keys.
 function getAiInstance(): GoogleGenAI {
-    const apiKey = process.env.API_KEY;
+    // Priority 1: Custom user-provided key
+    const userApiKey = localStorage.getItem('user_gemini_api_key');
+    // Priority 2: Environment variable
+    const apiKey = userApiKey || process.env.API_KEY;
 
     if (!apiKey) {
-        throw new Error("Gemini AI service is not configured. The API_KEY environment variable is missing.");
+        throw new Error("Gemini AI service is not configured. The API_KEY is missing or invalid.");
     }
     
     try {
@@ -28,7 +24,10 @@ function getAiInstance(): GoogleGenAI {
         return new GoogleGenAI({ apiKey });
     } catch (e) {
         console.error("Failed to initialize GoogleGenAI with the provided key:", e);
-        throw new Error("The Gemini API key appears to be invalid. Please check the environment configuration.");
+        if (userApiKey) {
+             throw new Error("Your custom API key seems to be invalid. Please check it in your profile or clear it to use the default.");
+        }
+        throw new Error("The default Gemini API key appears to be invalid. Please check the environment configuration.");
     }
 }
 
@@ -45,9 +44,12 @@ Add emojis when helpful to keep the tone friendly and engaging. 😊
 **CRITICAL FOR MATH & SCIENCE:** You MUST format all mathematical expressions, variables, equations, and chemical formulas using LaTeX syntax. This is mandatory. Wrap inline math with single dollar signs (e.g., $E=mc^2$). Wrap block-level equations with double dollar signs (e.g., $$x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$$).`;
 
 
-// FIX: Removed the custom API key bypass from the token deduction logic
-// to align with the guideline of using a single, environment-provided API key.
 const checkAndDeductTokens = (cost: number) => {
+    // If a custom user key is being used, don't check or deduct tokens.
+    if (localStorage.getItem('user_gemini_api_key')) {
+        return;
+    }
+
     const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
     if (urlParams.get('dev') === 'true') {
         console.log(`DEV MODE: Bypassing token check for cost: ${cost}`);
@@ -547,7 +549,7 @@ export const fetchYouTubeTranscript = async (url: string): Promise<string> => {
     checkAndDeductTokens(10);
     const prompt = `Please fetch the full transcript of the YouTube video at this URL: ${url}. If a transcript is available, return only the text content. If you cannot find a transcript, return the text "Could not fetch transcript."`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: { tools: [{googleSearch: {}}] }
@@ -578,7 +580,7 @@ export const fetchChapterContent = async (classLevel: ClassLevel, subject: Subje
 - Additional Details: ${chapterDetails || 'Any board/publisher'}
 `;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: { tools: [{googleSearch: {}}] }
@@ -597,7 +599,7 @@ NOTES:
 ${extractedText.substring(0, 8000)}
 ---`;
 
-    return ai.chats.create({
+    return ai!.chats.create({
         model: "gemini-2.5-flash",
         config: {
             systemInstruction
@@ -623,7 +625,7 @@ export const generateQuiz = async (subject: Subject, classLevel: ClassLevel, sou
     ${sourceText}
     ---END TEXT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -651,7 +653,7 @@ export const generateSmartSummary = async (subject: Subject, classLevel: ClassLe
     ${sourceText}
     ---END TEXT---`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -671,7 +673,7 @@ export const generateFlashcards = async (sourceText: string): Promise<Flashcard[
     ${sourceText}
     ---END TEXT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -696,7 +698,7 @@ export const evaluateWrittenAnswer = async (sourceText: string, question: string
     ---END SOURCE TEXT---
     Grade the answer out of 5.`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -713,7 +715,7 @@ export const evaluateWrittenAnswerFromImages = async (sourceText: string, questi
     checkAndDeductTokens(4);
     const textPart = { text: `The student was asked this question: "${question}" based on the provided study material. They have submitted the attached image(s) as their answer. Please evaluate it and provide feedback. Grade it out of 5. ${STUBRO_PERSONALITY_PROMPT}` };
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: { parts: [textPart, ...imageParts] },
         config: {
@@ -738,7 +740,7 @@ export const evaluateSpokenAnswerForQuiz = async (sourceText: string, question: 
         required: ['transcription', 'feedback']
     };
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: { parts: [textPart, audioPart] },
         config: {
@@ -767,7 +769,7 @@ export const generateQuestionPaper = async (sourceText: string, numQuestions: nu
     ${sourceText}
     ---END SOURCE TEXT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -796,7 +798,7 @@ export const gradeAnswerSheet = async (paperText: string, imageParts: { inlineDa
 
     The student's answer sheet is attached as images. Please provide the graded result in the specified JSON format.`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: { parts: [{ text: prompt }, ...imageParts] },
         config: {
@@ -820,7 +822,7 @@ export const generateCareerGuidance = async (interests: string, strengths: strin
 
     Please provide a detailed introduction and at least 2-3 diverse career paths. For each path, include a description, subjects to focus on, a step-by-step roadmap (from class 9-10 to after 12), top colleges in India, and potential for growth.`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -839,7 +841,7 @@ export const generateStudyPlan = async (goal: string): Promise<StudyPlan> => {
     The plan should be realistic, including specific topics for each day, clear goals, and suggested time slots (e.g., Morning, Afternoon).
     Break down the goal into manageable daily tasks. The title of the plan should reflect the student's goal.`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -858,7 +860,7 @@ export const generateMindMap = async (topic: string, classLevel: ClassLevel): Pr
     The main node should be the topic itself. It should have several key sub-topics as children. Each of these sub-topics can have further children, going up to 3-4 levels deep.
     For each node (term), provide a brief, one-sentence explanation.`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -880,7 +882,7 @@ export const generateMindMapFromText = async (sourceText: string, classLevel: Cl
     ${sourceText}
     ---END TEXT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -901,7 +903,7 @@ export const generateVivaQuestions = async (topic: string, classLevel: ClassLeve
     Generate ${numQuestions} insightful viva questions on this topic. The questions should test conceptual understanding.
     Return the questions as a simple JSON array of strings.`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -924,7 +926,7 @@ export const evaluateVivaAudioAnswer = async (question: string, audioPart: { inl
     2. Provide constructive feedback on their answer's correctness and clarity.
     3. Award marks out of 10.`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: { parts: [{ text: prompt }, audioPart] },
         config: {
@@ -944,7 +946,7 @@ export const evaluateVivaTextAnswer = async (question: string, answer: string): 
     2. Provide constructive feedback on their answer's correctness and clarity.
     3. Award marks out of 10.`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -959,7 +961,7 @@ export const evaluateVivaTextAnswer = async (question: string, answer: string): 
 export const createLiveDoubtsSession = (topic: string, classLevel: ClassLevel): Chat => {
     const ai = getAiInstance();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are in a live voice-to-voice doubt clearing session. The student is from ${classLevel} and wants to discuss the topic: "${topic}". Keep your answers conversational, clear, and concise, as if you are speaking to them. Wait for their question, then respond.`;
-    return ai.chats.create({
+    return ai!.chats.create({
         model: "gemini-2.5-flash",
         config: { systemInstruction }
     });
@@ -978,7 +980,7 @@ export const sendAudioForTranscriptionAndResponse = async (chat: Chat, audioPart
         required: ['transcription', 'response']
     };
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: {
             role: 'user',
@@ -1002,7 +1004,7 @@ export const generateDebateTopics = async (sourceText: string): Promise<string[]
     ${sourceText}
     ---END TEXT---`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -1023,7 +1025,7 @@ export const startDebateSession = (topic: string): Chat => {
     - Be respectful but firm. Point out logical fallacies in the user's arguments.
     - Your first message will be your opening statement on the topic.`;
 
-    return ai.chats.create({
+    return ai!.chats.create({
         model: "gemini-2.5-flash",
         config: { systemInstruction }
     });
@@ -1049,7 +1051,7 @@ export const getDebateResponseToAudio = async (chat: Chat, audioPart: { inlineDa
         required: ['transcription', 'rebuttal']
     };
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [{text: prompt}, audioPart] },
         config: { responseMimeType: 'application/json', responseSchema: schema }
@@ -1068,7 +1070,7 @@ export const evaluateDebate = async (history: DebateTurn[]): Promise<DebateScore
     ${transcript}
     ---END TRANSCRIPT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -1088,7 +1090,7 @@ export const breakdownTextIntoTopics = async (sourceText: string): Promise<{ tit
     ${sourceText}
     ---END TEXT---`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: topicsSchema }
@@ -1109,7 +1111,7 @@ export const generateScenesForTopic = async (topicContent: string, language: str
     ${topicContent}
     ---END TOPIC CONTENT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: visualExplanationSchema }
@@ -1119,7 +1121,7 @@ export const generateScenesForTopic = async (topicContent: string, language: str
 
     const generatedScenes = await Promise.allSettled(
         sceneBlueprints.map(async (blueprint: { narration: string, image_prompt: string }) => {
-            const imageResponse: GenerateImagesResponse = await withTimeout(ai.models.generateImages({
+            const imageResponse: GenerateImagesResponse = await withTimeout(ai!.models.generateImages({
                 model: 'imagen-4.0-generate-001',
                 prompt: blueprint.image_prompt,
                 config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
@@ -1160,7 +1162,7 @@ export const generateFullChapterSummaryVideo = async (sourceText: string, langua
     ${sourceText}
     ---END FULL TEXT---`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: summaryVideoSchema }
@@ -1171,7 +1173,7 @@ export const generateFullChapterSummaryVideo = async (sourceText: string, langua
     const successfulScenes: VisualExplanationScene[] = [];
     for (const blueprint of sceneBlueprints) {
         try {
-            const imageResponse: GenerateImagesResponse = await withTimeout(ai.models.generateImages({
+            const imageResponse: GenerateImagesResponse = await withTimeout(ai!.models.generateImages({
                 model: 'imagen-4.0-generate-001',
                 prompt: blueprint.image_prompt,
                 config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
@@ -1213,7 +1215,7 @@ export const generateGameLevel = async (sourceText: string): Promise<GameLevel> 
     ${sourceText}
     ---END CHAPTER TEXT---`;
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -1235,7 +1237,7 @@ export const generateLabExperiment = async (subject: Subject, topic: string, saf
     - Safety Level: ${safetyLevel}
     Provide a clear title, objective, hypothesis, list of materials, step-by-step procedure, and safety precautions.`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -1251,7 +1253,7 @@ export const createHistoricalChatSession = (figure: string): Chat => {
     const ai = getAiInstance();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are embodying the historical figure: ${figure}. You must answer all questions from the perspective, knowledge, and personality of ${figure}. Be engaging, informative, and stay in character. Do not reveal you are an AI.`;
 
-    return ai.chats.create({
+    return ai!.chats.create({
         model: "gemini-2.5-flash",
         config: {
             systemInstruction
@@ -1267,7 +1269,7 @@ export const analyzeLiteraryText = async (text: string): Promise<LiteraryAnalysi
     ${text}
     ---END TEXT---`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -1279,13 +1281,12 @@ export const analyzeLiteraryText = async (text: string): Promise<LiteraryAnalysi
     return JSON.parse(response.text);
 };
 
-// FIX: Completed the generateAnalogies function and added other missing functions.
 export const generateAnalogies = async (concept: string): Promise<Analogy[]> => {
     const ai = getAiInstance();
     checkAndDeductTokens(10);
-    const prompt = `Generate 2-3 simple, relatable analogies to explain the following concept: "${concept}". For each analogy, provide a brief, clear explanation of how it relates to the concept.`;
-    
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const prompt = `Generate 2-3 simple, relatable analogies to explain the concept of "${concept}". For each analogy, provide the analogy itself and a brief explanation of how it relates to the concept.`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
@@ -1293,45 +1294,59 @@ export const generateAnalogies = async (concept: string): Promise<Analogy[]> => 
             responseSchema: analogiesSchema,
         },
     }), 60000, 'Analogy Generation');
-    
+
     return JSON.parse(response.text);
 };
 
 export const createDilemmaChatSession = (topic: string): Chat => {
     const ai = getAiInstance();
-    const systemInstruction = `You are an ethics professor moderating a discussion. The user wants to explore an ethical dilemma related to "${topic}". Your role is to present a complex scenario, then ask probing questions to challenge the user's reasoning. You should guide them to consider different ethical frameworks (like utilitarianism, deontology) without being preachy. Stay neutral. Your first message will present the dilemma.`;
-    return ai.chats.create({ model: "gemini-2.5-flash", config: { systemInstruction } });
+    const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are an ethics professor moderating a discussion on an ethical dilemma.
+    Your role is to present a challenging scenario related to the topic of "${topic}".
+    After the user responds, you must challenge their reasoning, present counter-arguments, and explore the nuances and consequences of their decision.
+    Your goal is to encourage critical thinking, not to provide a "correct" answer. Remain neutral and facilitate a deep exploration of the moral landscape.`;
+
+    return ai!.chats.create({
+        model: "gemini-2.5-flash",
+        config: {
+            systemInstruction
+        }
+    });
 };
 
 export const exploreWhatIfHistory = async (scenario: string): Promise<string> => {
     const ai = getAiInstance();
-    checkAndDeductTokens(15);
-    const prompt = `Analyze the following alternate history "what if" scenario: "${scenario}".
-    Based on real historical context, principles of cause and effect, and societal development, provide a plausible and detailed explanation of how history might have unfolded differently. Discuss short-term and long-term consequences. Structure your response with clear paragraphs.`;
+    checkAndDeductTokens(12);
+    const prompt = `You are a historian specializing in counterfactual history.
+    A student has proposed the following "what if" scenario: "${scenario}".
+    Based on historical principles, cause and effect, and known facts up to the point of divergence, provide a detailed and plausible exploration of how history might have unfolded differently.
+    Discuss immediate consequences, long-term impacts on society, technology, politics, and culture.
+    Structure your answer in a clear, narrative format. Use headings.`;
     
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
-        model: "gemini-2.5-pro",
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
         contents: prompt,
+        config: { tools: [{ googleSearch: {} }] },
     }), 120000, 'What If History Exploration');
     
     return response.text;
 };
 
-export const predictExamPaper = async (syllabusText: string, difficulty: QuizDifficulty, totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
+export const predictExamPaper = async (sourceText: string, difficulty: 'Easy' | 'Medium' | 'Hard', totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
     const ai = getAiInstance();
     checkAndDeductTokens(25);
-    const prompt = `You are an expert exam paper setter for CBSE. Based on the provided syllabus/chapter text for ${subject}, generate a predicted question paper.
-    - Analyze the text to identify the most important topics likely to appear in an exam.
-    - Create a mix of question types (MCQs, short answer, long answer) that reflect a real exam pattern.
-    - Ensure the total marks are approximately ${totalMarks} and the difficulty is ${difficulty}.
-    - Provide model answers for each question.
+    const prompt = `You are an AI that predicts exam papers in the style of the Indian CBSE board. Based on the following source material, predict a question paper.
+    - Subject: ${subject || 'General'}
+    - Source Material: Use the provided text to identify important topics and generate relevant questions.
+    - Difficulty: ${difficulty}
+    - Total Marks: ${totalMarks}
+    Analyze the material to determine the most probable questions and their weightage. Create a realistic paper with a mix of MCQs, short answer, and long answer questions, reflecting the importance of each topic. Include model answers for each question.
     ${STUBRO_PERSONALITY_PROMPT}
-    ---SYLLABUS TEXT---
-    ${syllabusText}
-    ---END TEXT---`;
-    
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
-        model: "gemini-2.5-flash",
+    ---SOURCE MATERIAL---
+    ${sourceText}
+    ---END SOURCE MATERIAL---`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-pro",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -1345,34 +1360,50 @@ export const predictExamPaper = async (syllabusText: string, difficulty: QuizDif
 export const findRealWorldApplications = async (concept: string): Promise<RealWorldApplication[]> => {
     const ai = getAiInstance();
     checkAndDeductTokens(10);
-    const prompt = `For the academic concept "${concept}", identify 3-4 diverse real-world applications across different industries. For each application, name the industry and provide a brief, clear description of how the concept is used.`;
-    
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    const prompt = `For the academic concept "${concept}", find and describe 3-5 interesting real-world applications across different industries. For each, specify the industry and provide a clear description of how the concept is applied.`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
             responseSchema: realWorldApplicationsSchema,
+            tools: [{ googleSearch: {} }]
         },
-    }), 60000, 'Real World Application Finder');
-    
+    }), 120000, 'Real World Application Finder');
+
     return JSON.parse(response.text);
 };
 
-export const generateLearningPath = async (topic: string, subject: Subject, classLevel: ClassLevel, quizResults: QuizQuestion[]): Promise<LearningPath> => {
+export const generateLearningPath = async (topic: string, subject: Subject, classLevel: ClassLevel, answeredQuestions: QuizQuestion[]): Promise<LearningPath> => {
     const ai = getAiInstance();
     checkAndDeductTokens(20);
-    const resultsSummary = quizResults.map(q => `Question: "${q.question}", Correct: ${q.isCorrect}`).join('\n');
-    const prompt = `A ${classLevel} student took a diagnostic quiz on "${topic}" in ${subject}. Here are their results:\n${resultsSummary}\n\nBased on the questions they got wrong, identify their weak areas. Then, create a step-by-step personalized learning path to help them master the topic. For each step, provide a topic, a clear goal, and suggested resources/actions.`;
+    const quizAnalysis = answeredQuestions.map(q => ({
+        question: q.question,
+        userAnswer: q.userAnswer,
+        isCorrect: q.isCorrect,
+    }));
+    
+    const prompt = `A ${classLevel} student studying the Indian CBSE curriculum took a diagnostic quiz on the topic of "${topic}" in the subject of "${subject}".
+    Here are their results:
+    ${JSON.stringify(quizAnalysis, null, 2)}
 
-    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+    Based on the questions they got wrong, identify their weak areas.
+    Then, create a personalized, step-by-step learning path to help them master the main topic.
+    The plan MUST be suitable for a ${classLevel} student.
+    Each step should have a clear topic, a specific goal, and a list of suggested resources or actions.
+    The suggested resources should be appropriate for their level (e.g., suggest NCERT textbook chapters, relevant YouTube channels for Indian students, or general concepts to search for, not specific university-level textbooks).
+    ${STUBRO_PERSONALITY_PROMPT}
+    `;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
             responseSchema: learningPathSchema,
         },
-    }), 120000, 'Learning Path Generation');
+    }), 180000, 'Personalized Learning Path Generation');
     
     return JSON.parse(response.text);
 };

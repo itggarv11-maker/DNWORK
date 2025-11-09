@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
@@ -21,7 +20,7 @@ const AILabAssistantPage: React.FC = () => {
     const handleApiError = (err: unknown) => {
         const message = err instanceof Error ? err.message : "An unknown error occurred.";
         setError(message.includes("Insufficient tokens")
-            ? <span>You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-600">upgrade to Premium</Link>.</span>
+            ? <span>You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-600">upgrade to Premium</Link> for unlimited access.</span>
             : message);
         setIsLoading(false);
     };
@@ -98,17 +97,14 @@ const AILabAssistantPage: React.FC = () => {
         </Card>
     );
 
-    const renderExperiment = () => (
-        <div className="max-w-3xl mx-auto space-y-6">
-            <div className="text-center">
+    const renderResults = () => (
+        <div className="max-w-4xl mx-auto space-y-6">
+             <div className="text-center">
                 <h1 className="text-3xl font-bold text-slate-800">{experiment?.experimentTitle}</h1>
+                <p className="text-lg text-slate-600 mt-1">{experiment?.objective}</p>
             </div>
             <Card variant="light">
-                <h2 className="text-xl font-bold text-slate-700 mb-2">Objective</h2>
-                <p className="text-slate-600">{experiment?.objective}</p>
-            </Card>
-            <Card variant="light">
-                <h2 className="text-xl font-bold text-slate-700 mb-2">Hypothesis</h2>
+                <h2 className="text-xl font-bold text-slate-700 mb-2 flex items-center gap-2"><BookOpenIcon className="w-6 h-6 text-violet-500"/> Hypothesis</h2>
                 <p className="text-slate-600 italic">{experiment?.hypothesis}</p>
             </Card>
             <div className="grid md:grid-cols-2 gap-6">
@@ -118,31 +114,31 @@ const AILabAssistantPage: React.FC = () => {
                         {experiment?.materials.map((item, i) => <li key={i}>{item}</li>)}
                     </ul>
                 </Card>
-                 <Card variant="light" className="!bg-red-50/50 border-red-200">
-                    <h2 className="text-xl font-bold text-red-700 mb-3">Safety Precautions</h2>
-                    <ul className="list-disc list-inside space-y-1 text-red-800">
+                 <Card variant="light">
+                    <h2 className="text-xl font-bold text-red-600 mb-3">Safety Precautions</h2>
+                    <ul className="list-disc list-inside space-y-1 text-slate-600">
                         {experiment?.safetyPrecautions.map((item, i) => <li key={i}>{item}</li>)}
                     </ul>
                 </Card>
             </div>
             <Card variant="light">
                 <h2 className="text-xl font-bold text-slate-700 mb-3">Procedure</h2>
-                <ol className="list-decimal list-inside space-y-2 text-slate-700">
+                 <ol className="list-decimal list-inside space-y-2 text-slate-600">
                     {experiment?.procedure.map((step, i) => <li key={i}>{step}</li>)}
                 </ol>
             </Card>
-             <div className="text-center">
+            <div className="text-center">
                 <Button onClick={() => setExperiment(null)} variant="outline">Design Another Experiment</Button>
             </div>
         </div>
     );
-    
-    return isLoading ? (
-        <div className="flex justify-center items-center py-10">
-            <Spinner className="w-12 h-12" colorClass="bg-violet-600" />
+
+    return (
+        <div>
+            {isLoading && <div className="flex justify-center items-center py-10"><Spinner className="w-12 h-12" colorClass="bg-violet-600" /></div>}
+            {!isLoading && (experiment ? renderResults() : renderForm())}
         </div>
-    ) : experiment ? renderExperiment() : renderForm();
+    );
 };
 
-// FIX: Added default export
 export default AILabAssistantPage;

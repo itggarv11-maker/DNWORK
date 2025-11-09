@@ -1,6 +1,5 @@
-
 import React, { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import Button from '../components/common/Button';
 import { 
     AILabAssistantIcon, BookOpenIcon, BrainCircuitIcon, CalendarIcon, ChatBubbleLeftRightIcon,

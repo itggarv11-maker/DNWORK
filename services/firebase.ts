@@ -1,5 +1,5 @@
-import { initializeApp, getApp, getApps } from "firebase/app";
-import { initializeAuth, browserLocalPersistence } from "firebase/auth";
+import { initializeApp, getApp, getApps } from "https://esm.sh/firebase/app";
+import { initializeAuth, browserLocalPersistence } from "https://esm.sh/firebase/auth";
 
 // IMPORTANT: Replace these with your actual Firebase project configuration.
 // You can get them from your Firebase project settings (Project settings > General).

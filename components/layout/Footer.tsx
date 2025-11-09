@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'https://esm.sh/react-router-dom';
 import { HeartIcon } from '../icons/HeartIcon';
 
 const Footer: React.FC = () => {

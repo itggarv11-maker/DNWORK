@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
 import * as geminiService from '../services/geminiService';
 import { useContent } from '../contexts/ContentContext';
 import { VisualExplanationScene, ClassLevel, Subject } from '../types';
