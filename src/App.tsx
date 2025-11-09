@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { HashRouter, Route, Routes } from 'react-router-dom';
+// FIX: Using esm.sh for react-router-dom to resolve module loading errors.
+import { HashRouter, Route, Routes } from 'https://esm.sh/react-router-dom@6';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import HomePage from './pages/HomePage';

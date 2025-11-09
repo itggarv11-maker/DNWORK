@@ -1,6 +1,6 @@
+
 import React, { useState } from 'react';
-// FIX: Changed import path to use esm.sh for react-router-dom consistency.
-import { Link } from 'https://esm.sh/react-router-dom';
+import { Link } from 'react-router-dom';
 import Card from '../components/common/Card';
 import { LearningPathIcon } from '../components/icons/LearningPathIcon';
 import Button from '../components/common/Button';

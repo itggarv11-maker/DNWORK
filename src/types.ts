@@ -1,5 +1,7 @@
 
-import type { User } from 'firebase/auth';
+
+// FIX: Using esm.sh for firebase/auth to resolve module resolution issues.
+import type { User } from 'https://esm.sh/firebase/auth';
 
 export type FirebaseUser = User;
 

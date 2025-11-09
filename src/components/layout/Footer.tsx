@@ -1,6 +1,8 @@
 
+
 import React from 'react';
-import { Link } from 'react-router-dom';
+// FIX: Using esm.sh for react-router-dom to resolve module loading errors.
+import { Link } from 'https://esm.sh/react-router-dom@6';
 import { HeartIcon } from '../icons/HeartIcon';
 
 const Footer: React.FC = () => {

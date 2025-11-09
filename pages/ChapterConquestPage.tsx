@@ -1,10 +1,6 @@
 
-
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// FIX: Changed react-router-dom import to use esm.sh to resolve module export errors.
-import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GameLevel, PlayerPosition, Interaction } from '../types';
 import * as geminiService from '../services/geminiService';
 import { useContent } from '../contexts/ContentContext';
@@ -282,5 +278,4 @@ const ChapterConquestPage: React.FC = () => {
     );
 };
 
-// FIX: Added default export
 export default ChapterConquestPage;

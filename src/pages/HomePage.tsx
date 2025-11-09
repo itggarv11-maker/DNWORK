@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+// FIX: Using esm.sh for react-router-dom to resolve module loading errors.
+import { Link } from 'https://esm.sh/react-router-dom@6';
 import Button from '../components/common/Button';
 import { 
     AILabAssistantIcon, BookOpenIcon, BrainCircuitIcon, CalendarIcon, ChatBubbleLeftRightIcon,

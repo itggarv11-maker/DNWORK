@@ -1,11 +1,8 @@
 
 
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+// FIX: Using esm.sh for react-router-dom to resolve module loading errors.
+import { useNavigate, Link } from 'https://esm.sh/react-router-dom@6';
 import { GameLevel, PlayerPosition, Interaction } from '../types';
 import * as geminiService from '../services/geminiService';
 import { useContent } from '../contexts/ContentContext';
@@ -195,91 +192,3 @@ const ChapterConquestPage: React.FC = () => {
     
     if (gameState === 'error' || !level) {
          return (
-            <Card variant="light" className="max-w-xl mx-auto text-center">
-                <h1 className="text-2xl font-bold text-red-700">Failed to Build Game</h1>
-                <p className="mt-2 text-slate-600">{error || "An unknown error occurred."}</p>
-                <div className="mt-6">
-                    <Button onClick={() => window.location.reload()}>Try Again</Button>
-                </div>
-            </Card>
-        );
-    }
-    
-     if (gameState === 'completed') {
-        return (
-            <Card variant="light" className="max-w-2xl mx-auto text-center">
-                <h1 className="text-3xl font-bold text-slate-800 mt-4">Conquest Complete!</h1>
-                <p className="text-lg text-slate-600 mt-2">You have successfully completed '{level.title}'!</p>
-                <p className="text-4xl font-bold text-violet-700 my-4">Final Score: {score}</p>
-                <div className="mt-8 flex justify-center gap-4">
-                    <Button onClick={() => navigate('/app')} variant="outline">Back to Dashboard</Button>
-                    <Button onClick={() => window.location.reload()}>Play a New Game</Button>
-                </div>
-            </Card>
-        );
-    }
-
-    return (
-        <div className="w-full mx-auto">
-             <div className="text-center mb-4">
-                <h1 className="text-2xl font-bold text-slate-800">{level.title}</h1>
-                <p className="text-slate-600"><strong>Goal:</strong> {level.goal} | <strong>Score:</strong> {score}</p>
-                <p className="text-sm text-slate-500 font-semibold p-2 bg-slate-200/50 rounded-md inline-block">Use <kbd className="font-sans border rounded px-1.5 py-0.5 bg-white">WASD</kbd> or <kbd className="font-sans border rounded px-1.5 py-0.5 bg-white">Arrow Keys</kbd> to move. Press <kbd className="font-sans border rounded px-1.5 py-0.5 bg-white">E</kbd> near objects to interact.</p>
-            </div>
-            <div className="relative bg-gray-800 mx-auto overflow-hidden border-4 border-slate-700 rounded-lg shadow-2xl"
-                 style={{ width: level.grid[0].length * TILE_SIZE, height: level.grid.length * TILE_SIZE }}>
-                {level.grid.map((row, y) => (
-                    row.map((tile, x) => {
-                        let tileStyle = 'bg-gray-700 border-gray-600/50'; // floor
-                        if (tile.type === 'wall') tileStyle = 'bg-gray-900 border-gray-900/50';
-                        if (tile.type === 'exit') tileStyle = 'bg-green-600 border-green-500/50 animate-pulse';
-                        if (tile.type === 'interaction') {
-                           const interaction = level.interactions.find(i => i.position.x === x && i.position.y === y);
-                           tileStyle = interaction && completedInteractions.has(interaction.id) 
-                               ? 'bg-purple-800 border-purple-700/50' 
-                               : 'bg-purple-500 border-purple-400/50 animate-pulse';
-                        }
-                        return <div key={`${x}-${y}`} className={`absolute border ${tileStyle}`} style={{ left: x * TILE_SIZE, top: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE }} />;
-                    })
-                ))}
-                <div className="absolute bg-blue-400 rounded-md border-2 border-blue-200" style={{ left: playerPosition.x, top: playerPosition.y, width: TILE_SIZE * PLAYER_SIZE_RATIO, height: TILE_SIZE * PLAYER_SIZE_RATIO, margin: TILE_SIZE * (1 - PLAYER_SIZE_RATIO) / 2 }} />
-            </div>
-
-            {(gameState === 'interaction' || gameState === 'feedback') && activeInteraction && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <Card variant="light" className="w-full max-w-lg">
-                        {gameState === 'interaction' ? (
-                            <>
-                                <h2 className="text-xl font-bold text-slate-800 text-center">{activeInteraction.prompt}</h2>
-                                <div className="my-4">
-                                    <input
-                                        type="text"
-                                        value={interactionAnswer}
-                                        onChange={e => setInteractionAnswer(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleInteractionSubmit()}
-                                        className="w-full p-2 border border-slate-300 rounded-md"
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="text-center">
-                                    <Button onClick={handleInteractionSubmit}>Submit Answer</Button>
-                                </div>
-                            </>
-                        ) : (
-                             feedback && (
-                                <div className="text-center">
-                                    <h2 className={`text-2xl font-bold ${feedback.correct ? 'text-green-600' : 'text-red-600'}`}>
-                                        {feedback.correct ? 'Correct!' : 'Not Quite!'}
-                                    </h2>
-                                    <p className="mt-2 text-slate-700">{feedback.message}</p>
-                                    <Button onClick={closeFeedback} className="mt-4">Continue</Button>
-                                </div>
-                            )
-                        )}
-                    </Card>
-                </div>
-            )}
-        </div>
-    );
-};
-export default ChapterConquestPage;

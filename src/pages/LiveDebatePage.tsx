@@ -1,6 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Chat } from '@google/genai';
+// FIX: Using esm.sh for react-router-dom to resolve module loading errors.
+import { Link } from 'https://esm.sh/react-router-dom@6';
+// FIX: Using esm.sh for @google/genai to resolve module loading errors.
+import { Chat } from 'https://esm.sh/@google/genai';
 import * as geminiService from '../services/geminiService';
 import * as ttsService from '../services/ttsService';
 import { DebateTurn, DebateScorecard } from '../types';

@@ -1,6 +1,8 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+// FIX: Using esm.sh for react-router-dom to resolve module loading errors.
+import { NavLink, Link, useLocation, useNavigate } from 'https://esm.sh/react-router-dom@6';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
