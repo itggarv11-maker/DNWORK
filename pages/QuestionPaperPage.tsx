@@ -364,7 +364,7 @@ const QuestionPaperPage: React.FC = () => {
                                 
                                 <div className="bg-slate-100 p-3 rounded-md border border-slate-200 text-sm">
                                     <p className="font-semibold text-slate-600">Your Transcribed Answer:</p>
-                                    <div className="italic text-slate-800">"<MathRenderer text={gradedQ.studentAnswerTranscription || ''}" />"</div>
+                                    <div className="italic text-slate-800">"<MathRenderer text={gradedQ.studentAnswerTranscription || ''} />"</div>
                                 </div>
     
                                 <div className="bg-indigo-50 p-3 rounded-md border border-indigo-100 mt-2 text-sm space-y-2">
