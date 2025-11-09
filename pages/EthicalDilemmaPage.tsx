@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'https://esm.sh/react-router-dom';
 import Card from '../components/common/Card';
@@ -10,6 +9,27 @@ import * as geminiService from '../services/geminiService';
 import { ChatMessage } from '../types';
 
 const DILEMMA_TOPICS = ["General", "Technology & AI", "Medicine & Biology", "History & Society"];
+
+// New component to handle markdown and math rendering in chat
+const MessageContent: React.FC<{ text: string }> = ({ text }) => {
+    const contentRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (contentRef.current && window.renderMathInElement) {
+            window.renderMathInElement(contentRef.current, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false
+            });
+        }
+    }, [text]);
+
+    return <div ref={contentRef} className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br />') }} />;
+};
+
 
 const EthicalDilemmaPage: React.FC = () => {
     const [step, setStep] = useState<'setup' | 'chatting'>('setup');
@@ -123,7 +143,7 @@ const EthicalDilemmaPage: React.FC = () => {
                     <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                         {msg.role === 'model' && <span className="flex-shrink-0 w-8 h-8 bg-slate-700 text-white rounded-full flex items-center justify-center font-bold text-sm shadow">AI</span>}
                         <div className={`max-w-xl p-3 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-violet-600 text-white' : 'bg-white text-slate-800 border border-slate-200'}`}>
-                            <p className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }}/>
+                            <MessageContent text={msg.text} />
                         </div>
                         {msg.role === 'user' && <span className="flex-shrink-0 w-8 h-8 bg-violet-500 text-white rounded-full flex items-center justify-center font-bold text-sm shadow">You</span>}
                     </div>

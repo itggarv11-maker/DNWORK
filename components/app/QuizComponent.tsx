@@ -333,7 +333,7 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ questions, sourceText, su
                                     </div>
                                 )}
                                 <div className="mt-2 text-xs p-2 bg-indigo-100/80 rounded border border-indigo-200/50 text-indigo-800">
-                                    <MathRenderer text={`<strong>Explanation:</strong> ${q.explanation}`} />
+                                    <strong>Explanation:</strong>{` `}<MathRenderer text={q.explanation} />
                                 </div>
                             </Card>
                         )

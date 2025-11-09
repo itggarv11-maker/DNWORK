@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'https://esm.sh/react-router-dom';
 import { Chat } from '@google/genai';
 import * as geminiService from '../services/geminiService';
-import * as ttsService from '../../services/ttsService';
+import * as ttsService from '../services/ttsService';
 import { DebateTurn, DebateScorecard } from '../types';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';

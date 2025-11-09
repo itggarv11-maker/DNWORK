@@ -79,6 +79,28 @@ const toolCategories: { name: string; tools: Tool[] }[] = [
 type ActiveTool = 'chat' | 'quiz' | 'summary' | 'flashcards' | 'none';
 type QuestionTypeFilter = 'mcq' | 'written' | 'both';
 
+// New component to handle markdown and math rendering in chat
+const MessageContent: React.FC<{ text: string }> = ({ text }) => {
+    const contentRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (contentRef.current && window.renderMathInElement) {
+            window.renderMathInElement(contentRef.current, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false
+            });
+        }
+    }, [text]);
+
+    // Use dangerouslySetInnerHTML to render markdown/HTML from Gemini, then KaTeX runs on it
+    return <div ref={contentRef} className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br />') }} />;
+};
+
+
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const { extractedText, subject, classLevel, hasSessionStarted, resetContent } = useContent();
@@ -312,7 +334,9 @@ const DashboardPage: React.FC = () => {
                             {chatHistory.map((msg, index) => (
                             <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                                 {msg.role === 'model' && <span className="flex-shrink-0 w-8 h-8 bg-violet-600 text-white rounded-full flex items-center justify-center font-bold text-sm">AI</span>}
-                                <div className={`max-w-xl p-3 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-violet-600 text-white' : 'bg-slate-100'}`}><MathRenderer text={msg.text} /></div>
+                                <div className={`max-w-xl p-3 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-violet-600 text-white' : 'bg-slate-100'}`}>
+                                    <MessageContent text={msg.text} />
+                                </div>
                                 {msg.role === 'user' && <span className="flex-shrink-0 w-8 h-8 bg-slate-400 text-white rounded-full flex items-center justify-center font-bold text-sm">You</span>}
                             </div>))}
                         </div>
