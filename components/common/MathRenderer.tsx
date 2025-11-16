@@ -16,14 +16,16 @@ const MathRenderer: React.FC<MathRendererProps> = ({ text, className }) => {
 
     useEffect(() => {
         const container = containerRef.current;
-        if (container && window.renderMathInElement) {
-             // A short delay can sometimes help ensure the KaTeX script is fully ready
-             setTimeout(() => {
-                if (containerRef.current) { // Check if component is still mounted
-                    // First, set the raw text content
+        if (!container) return;
+
+        // The render function that will be called once KaTeX is ready.
+        const render = () => {
+            if (containerRef.current && window.renderMathInElement) {
+                try {
+                    // Set the text content first
                     containerRef.current.textContent = text;
-                    // Then, render math
-                    window.renderMathInElement!(containerRef.current, {
+                    // Then, let KaTeX process the element
+                    window.renderMathInElement(containerRef.current, {
                         delimiters: [
                             {left: '$$', right: '$$', display: true},
                             {left: '$', right: '$', display: false},
@@ -32,12 +34,29 @@ const MathRenderer: React.FC<MathRendererProps> = ({ text, className }) => {
                         ],
                         throwOnError: false
                     });
+                } catch (e) {
+                    console.error("KaTeX rendering error:", e);
+                    // Fallback to text content if rendering fails
+                    if(containerRef.current) containerRef.current.textContent = text;
                 }
-             }, 10);
-        } else if (container) {
-            // Fallback if KaTeX is not available
-            container.textContent = text;
+            }
+        };
+
+        // Set text immediately for non-JS or if KaTeX fails
+        container.textContent = text;
+
+        // If KaTeX is already available, render immediately.
+        if (window.renderMathInElement) {
+            render();
+        } else {
+            // Otherwise, wait for our custom 'katexready' event from index.html
+            window.addEventListener('katexready', render, { once: true });
         }
+        
+        // Cleanup the event listener when the component unmounts.
+        return () => {
+            window.removeEventListener('katexready', render);
+        };
     }, [text]);
 
     return <span ref={containerRef} className={className} />;
