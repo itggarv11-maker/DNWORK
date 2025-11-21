@@ -1,3 +1,4 @@
+
 import type { User } from 'https://esm.sh/firebase/auth';
 
 export type FirebaseUser = User;
@@ -96,6 +97,20 @@ export interface Flashcard {
   tip?: string;
 }
 
+export interface SmartSummary {
+  title: string;
+  coreConcepts: {
+    term: string;
+    definition: string;
+  }[];
+  visualAnalogy: {
+    analogy: string;
+    explanation: string;
+  };
+  examSpotlight: string[];
+  stuBroTip: string;
+}
+
 export interface MindMapNode {
   term: string;
   explanation: string;
@@ -152,7 +167,8 @@ export interface VivaQuestion {
 }
 
 export interface VisualExplanationScene {
-  imageBytes: string;
+  imageBytes?: string; // Made optional
+  imageUrl?: string;   // Added for web URLs
   narration: string;
 }
 
@@ -199,4 +215,63 @@ export interface GameLevel {
 export interface PlayerPosition {
     x: number;
     y: number;
+}
+
+// --- NEW TOOL TYPES ---
+
+export interface LabExperiment {
+    experimentTitle: string;
+    objective: string;
+    hypothesis: string;
+    materials: string[];
+    procedure: string[];
+    safetyPrecautions: string[];
+}
+
+export interface LiteraryAnalysis {
+    title: string;
+    author?: string;
+    themes: string[];
+    literaryDevices: {
+        device: string;
+        example: string;
+    }[];
+    characterAnalysis: {
+        character: string;
+        analysis: string;
+    }[];
+    overallSummary: string;
+}
+
+export interface Analogy {
+    analogy: string;
+    explanation: string;
+}
+
+export interface RealWorldApplication {
+    industry: string;
+    description: string;
+}
+
+export interface LearningStep {
+    step: number;
+    topic: string;
+    goal: string;
+    resources: string[];
+}
+
+export interface LearningPath {
+    mainTopic: string;
+    weakAreas: string[];
+    learningSteps: LearningStep[];
+}
+
+// --- History ---
+export interface WorkHistoryItem {
+  id: string;
+  type: string; // e.g., 'Question Paper', 'Mind Map'
+  date: string;
+  title: string;
+  data: any; // The full generated object
+  subject?: Subject;
 }

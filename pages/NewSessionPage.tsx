@@ -19,12 +19,10 @@ import { demoChapters } from '../services/demoContent';
 // Required for pdf.js to work
 pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.5.136/build/pdf.worker.mjs`;
 
-
 type ContentSource = 'paste' | 'file' | 'youtube' | 'search';
 
 const NewSessionPage: React.FC = () => {
     const navigate = useNavigate();
-    // Global Content State
     const { 
         setSubject: setGlobalSubject, 
         setClassLevel: setGlobalClassLevel, 
@@ -32,7 +30,6 @@ const NewSessionPage: React.FC = () => {
         startSessionWithContent
     } = useContent();
     
-    // Local Page State for content input
     const [subject, setSubject] = useState<Subject | null>(null);
     const [classLevel, setClassLevel] = useState<ClassLevel>('Class 10');
     const [contentSource, setContentSource] = useState<ContentSource>('paste');
@@ -43,20 +40,14 @@ const NewSessionPage: React.FC = () => {
     const [chapterDetails, setChapterDetails] = useState('');
     const [localSourceText, setLocalSourceText] = useState('');
     
-    // UI State
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [loadingMessage, setLoadingMessage] = useState('Processing...');
     const [error, setError] = useState<React.ReactNode | null>(null);
 
-    
     const handleApiError = (err: unknown) => {
         if (err instanceof Error) {
             if (err.message.includes("Insufficient tokens")) {
-                setError(
-                    <span>
-                        You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-600">upgrade to Premium</Link> for unlimited access.
-                    </span>
-                );
+                setError(<span>You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-400">upgrade to Premium</Link>.</span>);
             } else {
                 setError(err.message);
             }
@@ -70,20 +61,15 @@ const NewSessionPage: React.FC = () => {
         setError(null);
         setLocalSourceText('');
         setFileName('');
-        setChapterInfo('');
-        setChapterDetails('');
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         setError(null);
-        setLocalSourceText(''); 
         setIsLoading(true);
         setFileName(file.name);
-        setLoadingMessage('Reading file...');
-
+        setLoadingMessage('Decoding file...');
         try {
             let text = '';
             if (file.type === 'application/pdf') {
@@ -103,7 +89,7 @@ const NewSessionPage: React.FC = () => {
             }
             setLocalSourceText(text);
         } catch (err) {
-            setError('Failed to process file. It might be corrupted or in an unsupported format.');
+            setError('Failed to process file. Corrupted or unsupported.');
             setFileName('');
         } finally {
             setIsLoading(false);
@@ -111,15 +97,10 @@ const NewSessionPage: React.FC = () => {
     };
     
     const handleYoutubeFetch = async () => {
-        if(!youtubeUrl) {
-            setError("Please enter a YouTube URL.");
-            return;
-        }
+        if(!youtubeUrl) { setError("Please enter a YouTube URL."); return; }
         setError(null);
-        setLocalSourceText('');
         setIsLoading(true);
-        setLoadingMessage('Analyzing video content...');
-
+        setLoadingMessage('Extracting transcript...');
         try {
             const text = await geminiService.fetchYouTubeTranscript(youtubeUrl);
             setLocalSourceText(text);
@@ -131,10 +112,7 @@ const NewSessionPage: React.FC = () => {
     };
 
     const handleChapterSearch = () => {
-        if (!chapterInfo || !subject) {
-            setError("Please select a subject and enter a chapter name.");
-            return;
-        }
+        if (!chapterInfo || !subject) { setError("Subject and chapter name required."); return; }
         setError(null);
         setGlobalSubject(subject);
         setGlobalClassLevel(classLevel);
@@ -152,18 +130,12 @@ const NewSessionPage: React.FC = () => {
         navigate('/app');
     };
 
-
     const handleStartSession = () => {
-        let currentText = '';
-        if (contentSource === 'paste') currentText = pastedText;
-        else currentText = localSourceText;
-
+        let currentText = contentSource === 'paste' ? pastedText : localSourceText;
         if (!subject || currentText.trim().length < 100) {
-            setError("Please select a subject and provide sufficient content (at least 100 characters).");
+            setError("Please select a subject and provide sufficient content (100+ chars).");
             return;
         }
-        
-        setError(null);
         setGlobalSubject(subject);
         setGlobalClassLevel(classLevel);
         startSessionWithContent(currentText);
@@ -171,138 +143,144 @@ const NewSessionPage: React.FC = () => {
     };
 
     return (
-        <Card variant="light" className="!p-4 md:!p-8">
-            <div className="space-y-8">
-                <div className="text-center">
-                    <h1 className="text-3xl font-bold text-slate-800">Start a New Study Session</h1>
-                    <p className="text-gray-600">Provide your study material to unlock content-aware AI tools.</p>
+        <div className="max-w-4xl mx-auto pt-8">
+            <Card variant="dark" className="!p-8 md:!p-12 border-slate-800">
+                <div className="text-center mb-10">
+                    <h1 className="text-3xl md:text-4xl font-bold text-white">Initialize Data Stream</h1>
+                    <p className="text-slate-400 mt-2 text-lg">Input your study material to activate the AI Neural Core.</p>
                 </div>
-                 {/* Step 1: Class & Subject */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="text-lg font-semibold text-slate-700 block mb-3">1. Select Your Class</label>
-                        <select
-                            value={classLevel}
-                            onChange={(e) => setClassLevel(e.target.value as ClassLevel)}
-                            className="w-full p-3 bg-white/60 border border-slate-400 rounded-lg focus:ring-violet-500 focus:border-violet-500 transition text-slate-900"
-                        >
-                            {CLASS_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
-                        </select>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                    {/* Configuration Column */}
+                    <div className="md:col-span-4 space-y-6">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Class Level</label>
+                            <select
+                                value={classLevel}
+                                onChange={(e) => setClassLevel(e.target.value as ClassLevel)}
+                                className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent text-white transition-all"
+                            >
+                                {CLASS_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Target Subject</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {SUBJECTS.map(({ name, icon: Icon }) => (
+                                    <button
+                                        key={name}
+                                        onClick={() => setSubject(name)}
+                                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${subject === name ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/50' : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                                    >
+                                        <Icon className="w-5 h-5 mb-1" />
+                                        <span className="text-[10px] font-medium">{name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-lg font-semibold text-slate-700 block mb-3">2. Select a Subject</label>
-                        <div className="flex flex-wrap gap-2">
-                            {SUBJECTS.map(({ name, icon: Icon }) => (
-                                <button
-                                    key={name}
-                                    onClick={() => setSubject(name)}
-                                    className={`flex-auto flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all duration-200 text-sm interactive-3d ${subject === name ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-500/20' : 'bg-white/50 text-slate-700 hover:bg-white/80 border-slate-300 hover:border-violet-400'}`}
-                                >
-                                    <Icon className="w-5 h-5" />
-                                    <span className="font-medium">{name}</span>
-                                </button>
-                            ))}
+
+                    {/* Input Column */}
+                    <div className="md:col-span-8 space-y-6">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Data Source</label>
+                            <div className="flex p-1 bg-slate-900 rounded-xl mb-4 border border-slate-800">
+                                {(['paste', 'file', 'youtube', 'search'] as ContentSource[]).map(source => (
+                                    <button
+                                        key={source}
+                                        onClick={() => handleSourceChange(source)}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${contentSource === source ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                                    >
+                                        {source === 'paste' && <ClipboardIcon className="w-4 h-4" />}
+                                        {source === 'file' && <UploadIcon className="w-4 h-4" />}
+                                        {source === 'youtube' && <YouTubeIcon className="w-4 h-4" />}
+                                        {source === 'search' && <SearchIcon className="w-4 h-4" />}
+                                        <span className="capitalize hidden sm:inline">{source}</span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-1 min-h-[200px]">
+                                {contentSource === 'paste' &&
+                                    <textarea
+                                        value={pastedText}
+                                        onChange={(e) => setPastedText(e.target.value)}
+                                        placeholder="> Paste raw text data here..."
+                                        className="w-full h-64 p-4 bg-transparent border-none text-slate-300 placeholder-slate-600 focus:ring-0 font-mono text-sm resize-none"
+                                    />
+                                }
+                                {contentSource === 'file' &&
+                                    <div className="w-full h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-700 rounded-lg bg-slate-900/20">
+                                        <UploadIcon className="w-12 h-12 text-slate-600 mb-3"/>
+                                        <input id="file-upload" type="file" onChange={handleFileChange} accept=".pdf,.txt,.docx" className="hidden"/>
+                                        <label htmlFor="file-upload" className="text-violet-400 font-bold cursor-pointer hover:text-violet-300 hover:underline">
+                                            {fileName || "Select Document"}
+                                        </label>
+                                        <p className="text-xs text-slate-500 mt-2">PDF, DOCX, TXT supported</p>
+                                    </div>
+                                }
+                                {contentSource === 'youtube' &&
+                                    <div className="w-full h-64 flex flex-col items-center justify-center p-6 space-y-4">
+                                        <input
+                                            type="url"
+                                            value={youtubeUrl}
+                                            onChange={e => setYoutubeUrl(e.target.value)}
+                                            placeholder="https://youtube.com/watch?v=..."
+                                            className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-violet-500 focus:outline-none transition"
+                                        />
+                                        <Button onClick={handleYoutubeFetch} disabled={isLoading} variant="secondary" className="w-full">
+                                            {isLoading ? <Spinner /> : 'Analyze Video Stream'}
+                                        </Button>
+                                        {localSourceText && !isLoading && <p className="text-green-400 text-xs font-mono">>> Video transcript extracted successfully.</p>}
+                                    </div>
+                                }
+                                {contentSource === 'search' &&
+                                    <div className="w-full h-64 flex flex-col justify-center p-6 space-y-4">
+                                        <input
+                                            type="text"
+                                            value={chapterInfo}
+                                            onChange={e => setChapterInfo(e.target.value)}
+                                            placeholder="Chapter Name / Number"
+                                            className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-violet-500 focus:outline-none transition"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={chapterDetails}
+                                            onChange={e => setChapterDetails(e.target.value)}
+                                            placeholder="Details (e.g. Board, Author)"
+                                            className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-violet-500 focus:outline-none transition"
+                                        />
+                                         <Button onClick={handleChapterSearch} disabled={!chapterInfo || !subject} variant="secondary" className="w-full">
+                                             Initiate Deep Search
+                                         </Button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        
+                        {error && <p className="text-red-400 bg-red-900/20 border border-red-800/50 p-3 rounded-lg text-center text-sm font-medium">{error}</p>}
+                        
+                        <div className="pt-2">
+                            <Button onClick={handleStartSession} disabled={isLoading || !subject || (contentSource !== 'search' && !pastedText && !localSourceText)} size="lg" className="w-full text-lg font-bold py-4 shadow-lg shadow-violet-900/20">
+                                {isLoading ? <><Spinner/> {loadingMessage}</> : 'Upload to Dashboard'}
+                            </Button>
+                        </div>
+                         
+                        {/* Demo Shortcut */}
+                        <div className="pt-6 border-t border-slate-800 text-center">
+                            <p className="text-xs text-slate-600 mb-3 uppercase tracking-widest">Quick Access Demos</p>
+                            <div className="flex flex-wrap justify-center gap-3">
+                                {demoChapters.map(demo => (
+                                    <button key={demo.id} onClick={() => handleDemoChapterLoad(demo.id)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-full border border-slate-700 transition">
+                                        {demo.title}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                {/* Step 2: Content */}
-                <div>
-                    <label className="text-lg font-semibold text-slate-700 block mb-3">3. Provide Your Content</label>
-                    <div className="flex flex-wrap sm:flex-nowrap space-x-1 rounded-t-lg bg-slate-100 p-1 w-full">
-                        {(['paste', 'file', 'youtube', 'search'] as ContentSource[]).map(source => (
-                            <button
-                                key={source}
-                                onClick={() => handleSourceChange(source)}
-                                className={`flex items-center gap-2 w-full justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${contentSource === source ? 'bg-white text-violet-600 shadow' : 'text-slate-600 hover:bg-slate-200/50'}`}
-                            >
-                                {source === 'paste' && <ClipboardIcon className="w-5 h-5" />}
-                                {source === 'file' && <UploadIcon className="w-5 h-5" />}
-                                {source === 'youtube' && <YouTubeIcon className="w-5 h-5" />}
-                                {source === 'search' && <SearchIcon className="w-5 h-5" />}
-                                <span className="capitalize">{source}</span>
-                            </button>
-                        ))}
-                    </div>
-                    <div className="bg-white/60 p-4 rounded-b-lg border-x border-b border-slate-300">
-                        {contentSource === 'paste' &&
-                            <textarea
-                                value={pastedText}
-                                onChange={(e) => setPastedText(e.target.value)}
-                                placeholder="Paste your notes, a chapter, or any text here..."
-                                className="w-full h-40 p-3 bg-white/80 border border-slate-400 rounded-lg focus:ring-violet-500 focus:border-violet-500 transition text-slate-900 placeholder:text-slate-500"
-                            />
-                        }
-                        {contentSource === 'file' &&
-                            <div className="w-full h-40 p-3 border-2 bg-slate-200/50 rounded-lg flex flex-col items-center justify-center border-dashed border-slate-400">
-                                <UploadIcon className="w-10 h-10 text-slate-500 mb-2"/>
-                                <input id="file-upload" type="file" onChange={handleFileChange} accept=".pdf,.txt,.docx" className="hidden"/>
-                                <label htmlFor="file-upload" className="text-violet-600 font-semibold cursor-pointer hover:underline">
-                                    {fileName || "Choose a PDF, DOCX, or TXT file"}
-                                </label>
-                                <p className="text-xs text-slate-500 mt-1">{fileName ? `(File ready to be processed)` : `(Your file will be processed in the browser)`}</p>
-                            </div>
-                        }
-                        {contentSource === 'youtube' &&
-                            <div className="w-full h-40 p-3 rounded-lg flex flex-col justify-center gap-3">
-                                <input
-                                    type="url"
-                                    value={youtubeUrl}
-                                    onChange={e => setYoutubeUrl(e.target.value)}
-                                    placeholder="https://www.youtube.com/watch?v=..."
-                                    className="w-full p-2 bg-white/80 border border-slate-400 rounded-lg focus:ring-violet-500 focus:border-violet-500 transition text-slate-900 placeholder:text-slate-500"
-                                />
-                                <Button onClick={handleYoutubeFetch} disabled={isLoading} variant="secondary">
-                                    {isLoading && loadingMessage.includes('Analyzing') ? <Spinner /> : 'Analyze Video'}
-                                </Button>
-                                {localSourceText && !isLoading && <p className="text-sm text-green-600 text-center font-semibold">Video content loaded successfully!</p>}
-                            </div>
-                        }
-                        {contentSource === 'search' &&
-                            <div className="w-full h-40 p-3 rounded-lg flex flex-col justify-center gap-3">
-                                <input
-                                    type="text"
-                                    value={chapterInfo}
-                                    onChange={e => setChapterInfo(e.target.value)}
-                                    placeholder="Chapter name or number (e.g., 'Cell' or 'Ch 1')"
-                                    className="w-full p-2 bg-white/80 border border-slate-400 rounded-lg focus:ring-violet-500 focus:border-violet-500 transition text-slate-900 placeholder:text-slate-500"
-                                />
-                                <input
-                                    type="text"
-                                    value={chapterDetails}
-                                    onChange={e => setChapterDetails(e.target.value)}
-                                    placeholder="Optional details (e.g., NCERT, CBSE, author)"
-                                     className="w-full p-2 bg-white/80 border border-slate-400 rounded-lg focus:ring-violet-500 focus:border-violet-500 transition text-slate-900 placeholder:text-slate-500"
-                                />
-                                 <Button onClick={handleChapterSearch} disabled={!chapterInfo || !subject} variant="secondary">
-                                     Search & Start Session
-                                 </Button>
-                            </div>
-                        }
-                    </div>
-                </div>
-
-                 {/* Demo Chapters */}
-                <div className="text-center pt-2">
-                    <p className="text-sm font-medium text-slate-600 mb-3">Or, try a demo chapter:</p>
-                    <div className="flex flex-wrap justify-center gap-3">
-                        {demoChapters.map(demo => (
-                            <Button key={demo.id} onClick={() => handleDemoChapterLoad(demo.id)} variant="outline" size="sm">
-                                {demo.title}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-                
-                {error && <p className="text-red-500 text-center font-medium py-2">{error}</p>}
-                
-                <div className="text-center pt-4 flex items-center justify-center gap-4">
-                    <Button onClick={handleStartSession} disabled={isLoading || !subject || (contentSource !== 'search' && !pastedText && !localSourceText)} size="lg">
-                        {isLoading ? <><Spinner/> {loadingMessage}</> : 'Start Session with My Content'}
-                    </Button>
-                </div>
-            </div>
-        </Card>
+            </Card>
+        </div>
     );
 };
 

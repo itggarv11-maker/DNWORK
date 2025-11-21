@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
 import { useContent } from '../contexts/ContentContext';
 import { useAuth } from '../contexts/AuthContext';
+import { motion } from 'https://esm.sh/framer-motion';
 import {
     AcademicCapIcon, BookOpenIcon, BrainCircuitIcon, CalendarIcon, ChatBubbleIcon, ChatBubbleLeftRightIcon,
     ClipboardIcon, DocumentDuplicateIcon, GavelIcon, LightBulbIcon, MicrophoneIcon, QuestIcon, RectangleStackIcon,
@@ -28,49 +30,50 @@ interface Tool {
     description: string;
     requiresContent: boolean;
     subjects?: Subject[];
+    color: string; // Added for glow effects
 }
 
 const toolCategories: { name: string; tools: Tool[] }[] = [
     {
-        name: 'Core Study Tools',
+        name: 'Core Engine',
         tools: [
-            { path: '/app', icon: ChatBubbleIcon, title: 'AI Chat', description: 'Ask questions and get instant answers about your notes.', requiresContent: true },
-            { path: '/app', icon: LightBulbIcon, title: 'Generate Quiz', description: 'Test your knowledge with custom quizzes.', requiresContent: true },
-            { path: '/app', icon: DocumentDuplicateIcon, title: 'Smart Summary', description: 'Get concepts, analogies & exam tips from your text.', requiresContent: true },
-            { path: '/app', icon: RectangleStackIcon, title: 'Flashcards', description: 'Create flippable cards for quick revision.', requiresContent: true },
-            { path: '/mind-map', icon: BrainCircuitIcon, title: 'Mind Map', description: 'Visualize the core concepts from your text.', requiresContent: true },
+            { path: '/app', icon: ChatBubbleIcon, title: 'AI Chat', description: 'Deep dive into your notes with an intelligent assistant.', requiresContent: true, color: 'text-cyan-400' },
+            { path: '/app', icon: LightBulbIcon, title: 'Generate Quiz', description: 'Test your mastery with adaptive quizzes.', requiresContent: true, color: 'text-yellow-400' },
+            { path: '/app', icon: DocumentDuplicateIcon, title: 'Smart Summary', description: 'Extract concepts & exam tips instantly.', requiresContent: true, color: 'text-emerald-400' },
+            { path: '/app', icon: RectangleStackIcon, title: 'Flashcards', description: 'Active recall made effortless.', requiresContent: true, color: 'text-pink-400' },
+            { path: '/mind-map', icon: BrainCircuitIcon, title: 'Mind Map', description: 'Visualize connections in a neural network style.', requiresContent: true, color: 'text-violet-400' },
         ]
     },
     {
-        name: 'Advanced Learning',
+        name: 'Advanced Simulations',
         tools: [
-            { path: '/visual-explanation', icon: VideoCameraIcon, title: 'Visual Explanation', description: 'Generate a narrated video summary of your content.', requiresContent: true },
-            { path: '/live-debate', icon: GavelIcon, title: 'Live Debate Arena', description: 'Defend your knowledge in a real-time debate with an AI challenger.', requiresContent: true },
-            { path: '/chapter-conquest', icon: QuestIcon, title: 'Chapter Conquest', description: 'Play a 2D adventure game to master your chapter.', requiresContent: true },
-            { path: '/poetry-prose-analysis', icon: PoetryProseIcon, title: 'Poetry & Prose Analyst', description: 'Get deep analysis of any literary work.', requiresContent: true, subjects: [Subject.English] },
-            { path: '/concept-analogy', icon: ConceptAnalogyIcon, title: 'Concept Analogy Generator', description: 'Understand complex topics with simple analogies.', requiresContent: false },
-            { path: '/real-world-applications', icon: RealWorldIcon, title: 'Real-World Applications', description: 'Connect academic concepts to real-life industries.', requiresContent: false },
+            { path: '/visual-explanation', icon: VideoCameraIcon, title: 'Visual Explanation', description: 'Turn text into narrated AI videos.', requiresContent: true, color: 'text-rose-400' },
+            { path: '/live-debate', icon: GavelIcon, title: 'Debate Arena', description: 'Challenge an AI opponent in real-time.', requiresContent: true, color: 'text-orange-400' },
+            { path: '/chapter-conquest', icon: QuestIcon, title: 'Chapter Conquest', description: 'Gamify your notes into an RPG adventure.', requiresContent: true, color: 'text-amber-400' },
+            { path: '/poetry-prose-analysis', icon: PoetryProseIcon, title: 'Literary Analyst', description: 'Deep analysis of themes and devices.', requiresContent: true, subjects: [Subject.English], color: 'text-fuchsia-400' },
+            { path: '/concept-analogy', icon: ConceptAnalogyIcon, title: 'Concept Analogy', description: 'Understand anything via simple comparisons.', requiresContent: false, color: 'text-blue-400' },
+            { path: '/real-world-applications', icon: RealWorldIcon, title: 'Real-World Apps', description: 'See how theory applies to industry.', requiresContent: false, color: 'text-green-400' },
         ]
     },
     {
-        name: 'Exam & Career Prep',
+        name: 'Exam & Future',
         tools: [
-            { path: '/question-paper', icon: BookOpenIcon, title: 'Question Paper Generator', description: 'Create custom exam papers from your notes.', requiresContent: true },
-            { path: '/exam-predictor', icon: ExamPredictorIcon, title: 'Exam Paper Predictor', description: 'Get a predicted paper based on your syllabus.', requiresContent: true },
-            { path: '/viva', icon: MicrophoneIcon, title: 'Viva Prep', description: 'Practice for oral exams with a live AI examiner.', requiresContent: false },
-            { path: '/gemini-live', icon: ChatBubbleLeftRightIcon, title: 'Talk to Teacher', description: 'Have a live voice conversation with your AI tutor.', requiresContent: false },
-            { path: '/study-planner', icon: CalendarIcon, title: 'Smart Study Planner', description: 'Get a custom, day-by-day study schedule.', requiresContent: false },
-            { path: '/career-guidance', icon: RocketLaunchIcon, title: 'AI Career Guidance', description: 'Discover personalized career paths and roadmaps.', requiresContent: false },
+            { path: '/question-paper', icon: BookOpenIcon, title: 'Paper Generator', description: 'Create and grade custom exam papers.', requiresContent: true, color: 'text-indigo-400' },
+            { path: '/exam-predictor', icon: ExamPredictorIcon, title: 'Exam Predictor', description: 'AI predicts probable exam questions.', requiresContent: true, color: 'text-purple-400' },
+            { path: '/viva', icon: MicrophoneIcon, title: 'Viva Prep', description: 'Practice oral exams with a voice AI.', requiresContent: false, color: 'text-teal-400' },
+            { path: '/gemini-live', icon: ChatBubbleLeftRightIcon, title: 'Live Tutor', description: 'Voice conversation with an expert tutor.', requiresContent: false, color: 'text-sky-400' },
+            { path: '/study-planner', icon: CalendarIcon, title: 'Smart Planner', description: 'Adaptive schedules to reach your goals.', requiresContent: false, color: 'text-lime-400' },
+            { path: '/career-guidance', icon: RocketLaunchIcon, title: 'Career Path', description: 'AI-driven roadmap for your future.', requiresContent: false, color: 'text-red-400' },
         ]
     },
     {
-        name: 'Unique Explorations',
+        name: 'Exploration Lab',
         tools: [
-            { path: '/ai-lab-assistant', icon: AILabAssistantIcon, title: 'AI Lab Assistant', description: 'Design experiments, get hypotheses, and safety protocols.', requiresContent: false, subjects: [Subject.Physics, Subject.Chemistry, Subject.Biology, Subject.Science] },
-            { path: '/historical-chat', icon: HistoricalChatIcon, title: 'Historical Figure Chat', description: 'Chat with historical figures like Einstein.', requiresContent: false, subjects: [Subject.History, Subject.SST] },
-            { path: '/ethical-dilemma', icon: EthicalDilemmaIcon, title: 'Ethical Dilemma Simulator', description: 'Explore complex moral problems and challenge your reasoning.', requiresContent: false },
-            { path: '/what-if-history', icon: WhatIfHistoryIcon, title: '"What If?" History Explorer', description: 'Explore alternate historical scenarios.', requiresContent: false, subjects: [Subject.History, Subject.SST] },
-            { path: '/personalized-learning-path', icon: LearningPathIcon, title: 'Personalized Learning Path', description: 'Get a custom study plan based on your weak points.', requiresContent: false },
+            { path: '/ai-lab-assistant', icon: AILabAssistantIcon, title: 'Lab Assistant', description: 'Design experiments and safety protocols.', requiresContent: false, subjects: [Subject.Physics, Subject.Chemistry, Subject.Biology, Subject.Science], color: 'text-cyan-400' },
+            { path: '/historical-chat', icon: HistoricalChatIcon, title: 'History Chat', description: 'Talk to legends from the past.', requiresContent: false, subjects: [Subject.History, Subject.SST], color: 'text-amber-600' },
+            { path: '/ethical-dilemma', icon: EthicalDilemmaIcon, title: 'Ethical Dilemma', description: 'Navigate complex moral landscapes.', requiresContent: false, color: 'text-stone-400' },
+            { path: '/what-if-history', icon: WhatIfHistoryIcon, title: 'Alternate History', description: 'Explore "What If" timelines.', requiresContent: false, subjects: [Subject.History, Subject.SST], color: 'text-orange-300' },
+            { path: '/personalized-learning-path', icon: LearningPathIcon, title: 'Learning Path', description: 'Diagnostic driven study curriculum.', requiresContent: false, color: 'text-emerald-500' },
         ]
     }
 ];
@@ -97,7 +100,7 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
     }, [text]);
 
     // Use dangerouslySetInnerHTML to render markdown/HTML from Gemini, then KaTeX runs on it
-    return <div ref={contentRef} className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br />') }} />;
+    return <div ref={contentRef} className="prose prose-sm max-w-none prose-invert text-slate-200" dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br />') }} />;
 };
 
 
@@ -140,7 +143,7 @@ const DashboardPage: React.FC = () => {
     const handleApiError = (err: unknown) => {
         if (err instanceof Error) {
             setError(err.message.includes("Insufficient tokens")
-                ? <span>You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-600">upgrade to Premium</Link>.</span>
+                ? <span>You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-400">upgrade to Premium</Link>.</span>
                 : err.message);
         } else {
             setError("An unknown error occurred.");
@@ -171,7 +174,7 @@ const DashboardPage: React.FC = () => {
                         setLoadingMessage('Initializing AI session...');
                         const session = geminiService.createChatSession(subject!, classLevel, extractedText);
                         setChatSession(session);
-                        setChatHistory([{ role: 'model', text: `Hi there! I'm ready to help you with ${subject} for ${classLevel}. Ask me anything about your notes.` }]);
+                        setChatHistory([{ role: 'model', text: `Hi! I'm StuBro. I'm ready to help you with **${subject}** for **${classLevel}**. Ask me anything about your notes!` }]);
                     }
                     break;
                 case 'summary':
@@ -277,45 +280,73 @@ const DashboardPage: React.FC = () => {
     };
 
     const ToolCard: React.FC<{ tool: Tool }> = ({ tool }) => (
-        <Card
-            onClick={() => handleToolClick(tool)}
-            className="text-left !p-5 cursor-pointer bg-slate-800/5 hover:!bg-slate-800/10 !border-slate-800/10 flex flex-col h-full"
+        <motion.div
+            whileHover={{ scale: 1.02, y: -5 }}
+            whileTap={{ scale: 0.98 }}
         >
-            <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 mt-1 text-violet-600 bg-white rounded-lg h-12 w-12 flex items-center justify-center border-2 border-slate-200">
-                    <tool.icon className="w-7 h-7" />
+            <Card
+                onClick={() => handleToolClick(tool)}
+                variant="glass"
+                className="text-left !p-5 h-full flex flex-col relative overflow-hidden group border-slate-700/50 hover:border-violet-500/50 transition-colors duration-300"
+            >
+                <div className={`absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
+                
+                <div className="flex items-start gap-4 relative z-10">
+                    <div className={`flex-shrink-0 mt-1 rounded-xl h-12 w-12 flex items-center justify-center bg-slate-800 border border-slate-700 ${tool.color}`}>
+                        <tool.icon className="w-7 h-7" />
+                    </div>
+                    <div className="flex-grow">
+                        <h3 className="text-base font-bold text-slate-100 group-hover:text-white transition-colors">{tool.title}</h3>
+                        <p className="mt-1 text-slate-400 text-xs leading-relaxed">{tool.description}</p>
+                    </div>
                 </div>
-                <div className="flex-grow">
-                    <h3 className="text-base font-bold text-slate-800">{tool.title}</h3>
-                    <p className="mt-1 text-slate-600 text-xs leading-snug">{tool.description}</p>
-                </div>
-            </div>
-             {tool.requiresContent && <span className="text-xs font-bold text-violet-500 mt-2 ml-auto">REQUIRES CONTENT</span>}
-        </Card>
+                {tool.requiresContent && (
+                    <div className="mt-auto pt-3 flex justify-end">
+                         <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50">Content</span>
+                    </div>
+                )}
+            </Card>
+        </motion.div>
     );
     
     const renderQuizSettings = () => (
-         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card variant="light" className="max-w-md w-full">
-                <h3 className="text-xl font-bold mb-4 text-slate-800 text-center">Customize Your Quiz</h3>
+         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <Card variant="dark" className="max-w-md w-full animate-in zoom-in-95 duration-200">
+                <h3 className="text-xl font-bold mb-6 text-white text-center">Configure Quiz</h3>
                 <div className="space-y-6">
                     <div>
-                        <label htmlFor="question-count" className="block text-sm font-medium text-slate-700 mb-1">Number of Questions (Max 15)</label>
-                        <input type="number" id="question-count" value={quizQuestionCount} onChange={(e) => setQuizQuestionCount(Math.min(15, Math.max(1, parseInt(e.target.value) || 1)))} min="1" max="15" className="mt-1 block w-full px-3 py-2 bg-white/80 border border-slate-400 rounded-md"/>
+                        <label htmlFor="question-count" className="block text-sm font-medium text-slate-300 mb-2">Number of Questions</label>
+                        <div className="flex items-center gap-4">
+                            <input 
+                                type="range" 
+                                min="1" 
+                                max="15" 
+                                value={quizQuestionCount} 
+                                onChange={(e) => setQuizQuestionCount(parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                            />
+                            <span className="text-white font-bold w-8 text-center">{quizQuestionCount}</span>
+                        </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Question Types</label>
-                        <div className="flex rounded-md shadow-sm">
-                            {(['mcq', 'written', 'both'] as QuestionTypeFilter[]).map((type, idx) => (
-                                <button key={type} type="button" onClick={() => setQuizQuestionType(type)} className={`py-2 px-4 w-full text-sm font-medium transition-colors border border-slate-300 ${idx === 0 ? 'rounded-l-lg' : ''} ${idx === 2 ? 'rounded-r-lg' : ''} ${quizQuestionType === type ? 'bg-violet-600 text-white' : 'bg-white/70'}`}>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Question Types</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {(['mcq', 'written', 'both'] as QuestionTypeFilter[]).map((type) => (
+                                <button
+                                key={type}
+                                type="button"
+                                onClick={() => setQuizQuestionType(type)}
+                                className={`py-2 px-2 text-xs sm:text-sm font-medium rounded-lg transition-all border
+                                ${quizQuestionType === type ? 'bg-violet-600 text-white border-violet-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
+                                >
                                 {type.charAt(0).toUpperCase() + type.slice(1)}
                                 </button>
                             ))}
                         </div>
                     </div>
-                    <div className="flex justify-center gap-4 pt-2">
-                        <Button variant="outline" onClick={() => { setShowQuizSettings(false); setActiveTool('none');}}>Cancel</Button>
-                        <Button onClick={handleGenerateQuiz}>Generate Quiz</Button>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                        <Button variant="ghost" onClick={() => { setShowQuizSettings(false); setActiveTool('none');}}>Cancel</Button>
+                        <Button variant="primary" onClick={handleGenerateQuiz}>Start Quiz</Button>
                     </div>
                 </div>
             </Card>
@@ -324,27 +355,49 @@ const DashboardPage: React.FC = () => {
     
     const renderToolUI = () => {
         if (showQuizSettings) return renderQuizSettings();
-        if (isLoading) return <div className="flex flex-col items-center gap-4 py-10"><Spinner className="w-12 h-12" colorClass="bg-violet-600" /><p>{loadingMessage}</p></div>;
+        if (isLoading) return (
+            <div className="flex flex-col items-center gap-4 py-20">
+                <Spinner className="w-16 h-16" colorClass="bg-violet-500" />
+                <p className="text-slate-400 animate-pulse text-lg font-medium">{loadingMessage}</p>
+            </div>
+        );
         
         switch(activeTool) {
             case 'chat':
                 return (
-                    <Card variant="light"><div className="flex flex-col h-[60vh] bg-white/50 rounded-lg border border-slate-300">
-                        <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
+                    <Card variant="dark" className="h-[70vh] flex flex-col border-slate-700">
+                        <div className="flex-grow p-4 space-y-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                             {chatHistory.map((msg, index) => (
-                            <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                                {msg.role === 'model' && <span className="flex-shrink-0 w-8 h-8 bg-violet-600 text-white rounded-full flex items-center justify-center font-bold text-sm">AI</span>}
-                                <div className={`max-w-xl p-3 rounded-lg shadow-sm ${msg.role === 'user' ? 'bg-violet-600 text-white' : 'bg-slate-100'}`}>
+                            <div key={index} className={`flex items-end gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                                {msg.role === 'model' && (
+                                    <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-900/20">
+                                        <ChatBubbleIcon className="w-4 h-4 text-white" />
+                                    </div>
+                                )}
+                                <div className={`max-w-2xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-slate-800/80 border border-slate-700 text-slate-200 rounded-bl-sm'}`}>
                                     <MessageContent text={msg.text} />
                                 </div>
-                                {msg.role === 'user' && <span className="flex-shrink-0 w-8 h-8 bg-slate-400 text-white rounded-full flex items-center justify-center font-bold text-sm">You</span>}
+                                {msg.role === 'user' && (
+                                     <div className="flex-shrink-0 w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
+                                        <span className="text-xs font-bold text-white">YOU</span>
+                                    </div>
+                                )}
                             </div>))}
+                            <div ref={chatContainerRef} />
                         </div>
-                        <form onSubmit={handleSendMessage} className="p-4 border-t bg-slate-100/50 rounded-b-lg flex gap-2">
-                            <input type="text" value={userMessage} onChange={(e) => setUserMessage(e.target.value)} placeholder="Ask a question..." className="w-full p-2 bg-white border border-slate-300 rounded-lg"/>
-                            <Button type="submit" disabled={isLoading || !userMessage.trim()}>Send</Button>
+                        <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-700/50 bg-slate-800/30 flex gap-3">
+                            <input 
+                                type="text" 
+                                value={userMessage} 
+                                onChange={(e) => setUserMessage(e.target.value)} 
+                                placeholder="Ask a question about your content..." 
+                                className="flex-grow bg-slate-900/50 border border-slate-600 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-500"
+                            />
+                            <Button type="submit" disabled={isLoading || !userMessage.trim()} className="rounded-xl aspect-square flex items-center justify-center !p-0 w-12">
+                                <RocketLaunchIcon className="w-5 h-5 transform rotate-45" />
+                            </Button>
                         </form>
-                    </div></Card>
+                    </Card>
                 );
             case 'quiz': return quiz ? <QuizComponent questions={quiz} sourceText={extractedText} subject={subject!} /> : null;
             case 'summary': return smartSummary && <SmartSummaryComponent summary={smartSummary} />;
@@ -354,63 +407,91 @@ const DashboardPage: React.FC = () => {
     };
 
     if (!hasSessionStarted) {
-        return <div className="flex justify-center items-center h-64"><Spinner className="w-12 h-12" /></div>;
+        return <div className="flex justify-center items-center h-screen bg-slate-950"><Spinner className="w-16 h-16" colorClass="bg-violet-600" /></div>;
     }
 
     if (activeTool !== 'none') {
         return (
-            <div>
-                <div className="text-center mb-8">
-                     <Button onClick={handleGoBackToTools} variant="ghost" size="sm">
-                        &larr; Back to Dashboard
+            <div className="max-w-5xl mx-auto">
+                <div className="mb-6 flex items-center justify-between">
+                     <Button onClick={handleGoBackToTools} variant="ghost" className="text-slate-400 hover:text-white">
+                        &larr; Back to Command Center
                     </Button>
+                    <h2 className="text-xl font-bold text-white">{activeTool === 'chat' ? 'AI Assistant' : activeTool.charAt(0).toUpperCase() + activeTool.slice(1)}</h2>
                 </div>
-                {error && <p className="text-red-500 text-center font-medium mb-4">{error}</p>}
-                {renderToolUI()}
+                {error && <p className="text-red-400 bg-red-900/20 border border-red-800 p-4 rounded-lg text-center mb-6">{error}</p>}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    {renderToolUI()}
+                </motion.div>
             </div>
         );
     }
     
     return (
-        <div className="space-y-8">
-            <Card variant="light" className="!p-8 bg-gradient-to-br from-violet-50 via-white to-pink-50">
-                <div className="text-center">
-                    <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
-                        Welcome, {userName || currentUser?.email?.split('@')[0] || 'Student'}!
+        <div className="space-y-10">
+            {/* Header Section */}
+            <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-violet-900/40 to-slate-900/40 border border-white/10 p-8 md:p-12 text-center backdrop-blur-sm"
+            >
+                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay"></div>
+                <div className="relative z-10">
+                    <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 mb-4">
+                        Command Center
                     </h1>
-                     <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
-                        {extractedText 
-                            ? `Your ${subject ? `**${subject}**` : ''} notes for **${classLevel}** are loaded. Choose a tool to begin!`
-                            : "No content loaded. Choose a tool that doesn't require content, or start a new session."
+                    <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-8 leading-relaxed">
+                         Welcome back, <span className="text-violet-400 font-semibold">{userName || 'Student'}</span>. 
+                         {extractedText 
+                            ? <span> Content loaded: <span className="text-white font-bold">{subject} ({classLevel})</span>. All systems operational.</span>
+                            : " No data stream detected. Initialize a new session to activate tools."
                         }
                     </p>
-                    <div className="mt-6">
-                        <Button onClick={resetContent} size="lg">
-                            <AcademicCapIcon className="w-6 h-6"/>
-                            Start a New Study Session
-                        </Button>
-                    </div>
+                    <Button onClick={resetContent} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white backdrop-blur-md">
+                        <AcademicCapIcon className="w-5 h-5"/>
+                        Initialize New Session
+                    </Button>
                 </div>
-            </Card>
+            </motion.div>
 
-            {toolCategories.map(category => {
+            {/* Tool Grid */}
+            <div className="space-y-12">
+            {toolCategories.map((category, categoryIdx) => {
                 const filteredTools = category.tools.filter(tool => {
-                    if (!subject) return true; // Show all if no subject is set
-                    if (!tool.subjects) return true; // Generic tool, always show
-                    return tool.subjects.includes(subject); // Show if subject matches
+                    if (!subject) return true; 
+                    if (!tool.subjects) return true; 
+                    return tool.subjects.includes(subject); 
                 });
 
                 if (filteredTools.length === 0) return null;
 
                 return (
-                    <div key={category.name}>
-                        <h2 className="text-2xl font-bold text-slate-700 mb-4">{category.name}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {filteredTools.map(tool => <ToolCard key={tool.title} tool={tool} />)}
+                    <motion.div 
+                        key={category.name}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: categoryIdx * 0.1 }}
+                    >
+                        <div className="flex items-center gap-4 mb-6">
+                            <h2 className="text-xl font-bold text-white tracking-wide uppercase">{category.name}</h2>
+                            <div className="h-[1px] flex-grow bg-gradient-to-r from-slate-700 to-transparent"></div>
                         </div>
-                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {filteredTools.map((tool, idx) => (
+                                <motion.div
+                                    key={tool.title}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: (categoryIdx * 0.1) + (idx * 0.05) }}
+                                >
+                                    <ToolCard tool={tool} />
+                                </motion.div>
+                            ))}
+                        </div>
+                    </motion.div>
                 );
             })}
+            </div>
         </div>
     );
 };

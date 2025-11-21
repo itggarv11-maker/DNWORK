@@ -1,9 +1,11 @@
+
 import { GoogleGenAI, Type, Chat, GenerateContentResponse, GenerateImagesResponse } from "@google/genai";
 import { 
     QuizQuestion, Subject, ClassLevel, WrittenFeedback, QuestionPaper, GradedPaper, 
     Flashcard, QuizDifficulty, MindMapNode, StudyPlan, QuizHistoryItem, 
     CareerInfo, VisualExplanationScene, DebateTurn, DebateScorecard, GameLevel, 
-    VivaQuestion
+    VivaQuestion, LabExperiment, LiteraryAnalysis, Analogy, RealWorldApplication, LearningPath,
+    SmartSummary
 } from "../types";
 import { auth as firebaseAuth } from "./firebase";
 
@@ -143,6 +145,43 @@ const flashcardsSchema = {
         required: ["term", "definition"]
     }
 };
+
+const smartSummarySchema = {
+    type: Type.OBJECT,
+    properties: {
+        title: { type: Type.STRING, description: "A concise title for the summary based on the text." },
+        coreConcepts: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    term: { type: Type.STRING, description: "A key term or concept from the text." },
+                    definition: { type: Type.STRING, description: "A brief definition of the term." }
+                },
+                required: ["term", "definition"]
+            }
+        },
+        visualAnalogy: {
+            type: Type.OBJECT,
+            properties: {
+                analogy: { type: Type.STRING, description: "A simple, visual analogy to explain the main concept." },
+                explanation: { type: Type.STRING, description: "A short explanation of how the analogy works." }
+            },
+            required: ["analogy", "explanation"]
+        },
+        examSpotlight: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "A list of 2-3 points from the text that are highly likely to appear in a CBSE exam."
+        },
+        stuBroTip: {
+            type: Type.STRING,
+            description: "A friendly, encouraging tip in Hinglish (e.g., 'Don't worry, practice makes perfect! Revision kar lo, sab set ho jayega.')."
+        }
+    },
+    required: ["title", "coreConcepts", "visualAnalogy", "examSpotlight", "stuBroTip"]
+};
+
 
 const mindMapSchema = {
     type: Type.OBJECT,
@@ -394,6 +433,98 @@ const gameLevelSchema = {
     required: ['title', 'theme', 'goal', 'player_start', 'grid', 'interactions']
 };
 
+const labExperimentSchema = {
+    type: Type.OBJECT,
+    properties: {
+        experimentTitle: { type: Type.STRING },
+        objective: { type: Type.STRING },
+        hypothesis: { type: Type.STRING },
+        materials: { type: Type.ARRAY, items: { type: Type.STRING } },
+        procedure: { type: Type.ARRAY, items: { type: Type.STRING } },
+        safetyPrecautions: { type: Type.ARRAY, items: { type: Type.STRING } },
+    },
+    required: ['experimentTitle', 'objective', 'hypothesis', 'materials', 'procedure', 'safetyPrecautions']
+};
+
+const literaryAnalysisSchema = {
+    type: Type.OBJECT,
+    properties: {
+        title: { type: Type.STRING },
+        author: { type: Type.STRING },
+        themes: { type: Type.ARRAY, items: { type: Type.STRING } },
+        literaryDevices: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    device: { type: Type.STRING },
+                    example: { type: Type.STRING },
+                },
+                required: ['device', 'example']
+            }
+        },
+        characterAnalysis: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    character: { type: Type.STRING },
+                    analysis: { type: Type.STRING },
+                },
+                required: ['character', 'analysis']
+            }
+        },
+        overallSummary: { type: Type.STRING }
+    },
+    required: ['title', 'themes', 'literaryDevices', 'characterAnalysis', 'overallSummary']
+};
+
+const analogiesSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            analogy: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+        },
+        required: ['analogy', 'explanation']
+    }
+};
+
+const realWorldApplicationsSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            industry: { type: Type.STRING },
+            description: { type: Type.STRING },
+        },
+        required: ['industry', 'description']
+    }
+};
+
+const learningPathSchema = {
+    type: Type.OBJECT,
+    properties: {
+        mainTopic: { type: Type.STRING },
+        weakAreas: { type: Type.ARRAY, items: { type: Type.STRING } },
+        learningSteps: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    step: { type: Type.NUMBER },
+                    topic: { type: Type.STRING },
+                    goal: { type: Type.STRING },
+                    resources: { type: Type.ARRAY, items: { type: Type.STRING } },
+                },
+                required: ['step', 'topic', 'goal', 'resources']
+            }
+        }
+    },
+    required: ['mainTopic', 'weakAreas', 'learningSteps']
+};
+
 
 export const fetchYouTubeTranscript = async (url: string): Promise<string> => {
     checkAiService();
@@ -471,6 +602,7 @@ export const generateQuiz = async (subject: Subject, classLevel: ClassLevel, sou
     The difficulty should be ${difficulty}.
     Question types should be: ${questionType}.
     For MCQs, provide 4 options.
+    ${STUBRO_PERSONALITY_PROMPT}
     ---TEXT---
     ${sourceText}
     ---END TEXT---`;
@@ -486,6 +618,32 @@ export const generateQuiz = async (subject: Subject, classLevel: ClassLevel, sou
     
     const result = JSON.parse(response.text);
     return result.questions;
+};
+
+export const generateSmartSummary = async (subject: Subject, classLevel: ClassLevel, sourceText: string): Promise<SmartSummary> => {
+    checkAiService();
+    checkAndDeductTokens(8);
+    const prompt = `You are an expert at creating engaging and effective study materials for Indian CBSE students.
+    Analyze the following text on ${subject} for a ${classLevel} student and generate a "Smart Summary".
+    The summary must be structured in a specific JSON format.
+    - **Core Concepts:** Identify 3-5 of the most important terms/concepts and provide a brief, clear definition for each.
+    - **Visual Analogy:** Create a simple, relatable analogy to explain the main idea of the text.
+    - **Exam Spotlight:** Pinpoint 2-3 specific points or formulas from the text that are highly likely to appear in CBSE exams. Be specific.
+    - **StuBro Tip:** Provide one friendly, encouraging tip in Hinglish.
+    ${STUBRO_PERSONALITY_PROMPT}
+    ---TEXT---
+    ${sourceText}
+    ---END TEXT---`;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: smartSummarySchema,
+        },
+    }), 60000, 'Smart Summary Generation');
+    return JSON.parse(response.text);
 };
 
 export const generateSummary = async (subject: Subject, classLevel: ClassLevel, sourceText: string): Promise<string> => {
@@ -506,7 +664,8 @@ export const generateSummary = async (subject: Subject, classLevel: ClassLevel, 
 export const generateFlashcards = async (sourceText: string): Promise<Flashcard[]> => {
     checkAiService();
     checkAndDeductTokens(10);
-    const prompt = `Based on the following text, create a set of flashcards with terms, definitions, and an optional learning tip.
+    const prompt = `Based on the following text, create a set of flashcards with terms, definitions, and an optional learning tip or mnemonic.
+    ${STUBRO_PERSONALITY_PROMPT}
     ---TEXT---
     ${sourceText}
     ---END TEXT---`;
@@ -528,6 +687,7 @@ export const evaluateWrittenAnswer = async (sourceText: string, question: string
     checkAiService();
     checkAndDeductTokens(3);
     const prompt = `Based on the source text, evaluate the student's written answer to the question.
+    ${STUBRO_PERSONALITY_PROMPT}
     QUESTION: ${question}
     STUDENT'S ANSWER: ${answer}
     ---SOURCE TEXT---
@@ -550,7 +710,7 @@ export const evaluateWrittenAnswer = async (sourceText: string, question: string
 export const evaluateWrittenAnswerFromImages = async (sourceText: string, question: string, imageParts: { inlineData: { mimeType: string; data: string; } }[]): Promise<WrittenFeedback> => {
     checkAiService();
     checkAndDeductTokens(4);
-    const textPart = { text: `The student was asked this question: "${question}" based on the provided study material. They have submitted the attached image(s) as their answer. Please evaluate it and provide feedback. Grade it out of 5.` };
+    const textPart = { text: `The student was asked this question: "${question}" based on the provided study material. They have submitted the attached image(s) as their answer. Please evaluate it and provide feedback. Grade it out of 5. ${STUBRO_PERSONALITY_PROMPT}` };
     
     const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
         model: "gemini-2.5-flash",
@@ -567,7 +727,7 @@ export const evaluateWrittenAnswerFromImages = async (sourceText: string, questi
 export const evaluateSpokenAnswerForQuiz = async (sourceText: string, question: string, audioPart: { inlineData: { mimeType: string; data: string; } }): Promise<{ transcription: string; feedback: WrittenFeedback; }> => {
     checkAiService();
     checkAndDeductTokens(4);
-    const textPart = { text: `A student was asked this question during a quiz: "${question}". They responded with the attached audio. First, transcribe their answer. Then, evaluate the transcribed answer for correctness and provide feedback based on the study material. Grade it out of 5.` };
+    const textPart = { text: `A student was asked this question during a quiz: "${question}". They responded with the attached audio. First, transcribe their answer. Then, evaluate the transcribed answer for correctness and provide feedback based on the study material. Grade it out of 5. ${STUBRO_PERSONALITY_PROMPT}` };
     const schema = {
         type: Type.OBJECT,
         properties: {
@@ -601,6 +761,7 @@ export const generateQuestionPaper = async (sourceText: string, numQuestions: nu
     - Total Marks: ${totalMarks}
     - Instructions: Include standard exam instructions.
     - For each question, provide the model answer.
+    ${STUBRO_PERSONALITY_PROMPT}
     ---SOURCE TEXT---
     ${sourceText}
     ---END SOURCE TEXT---`;
@@ -626,6 +787,7 @@ export const gradeAnswerSheet = async (paperText: string, imageParts: { inlineDa
     3. Award marks for each question based on correctness.
     4. Provide specific feedback for each question: what was correct, what was incorrect, and suggestions for improvement.
     5. Calculate the total marks awarded and provide overall feedback on the student's performance.
+    ${STUBRO_PERSONALITY_PROMPT}
 
     ---QUESTION PAPER & MODEL ANSWERS---
     ${paperText}
@@ -954,33 +1116,17 @@ export const generateScenesForTopic = async (topicContent: string, language: str
     
     const sceneBlueprints = JSON.parse(response.text);
 
-    const generatedScenes = await Promise.allSettled(
-        sceneBlueprints.map(async (blueprint: { narration: string, image_prompt: string }) => {
-            const imageResponse: GenerateImagesResponse = await withTimeout(ai!.models.generateImages({
-                model: 'imagen-3.0-generate-002',
-                prompt: blueprint.image_prompt,
-                config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
-            }), 60000, 'Image Generation');
-            
-            if (!imageResponse.generatedImages || imageResponse.generatedImages.length === 0) {
-                throw new Error('Image generation failed for a scene.');
-            }
-            
-            return {
-                narration: blueprint.narration,
-                imageBytes: imageResponse.generatedImages[0].image.imageBytes,
-            };
-        })
-    );
-
-    const successfulScenes = generatedScenes
-        .filter(result => result.status === 'fulfilled')
-        .map(result => (result as PromiseFulfilledResult<VisualExplanationScene>).value);
-    
-    if(successfulScenes.length === 0 && generatedScenes.length > 0) {
-        const firstError = generatedScenes.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
-        throw new Error(firstError?.reason?.message || "All image generations for the topic failed.");
-    }
+    // Construct high-quality image URLs mimicking "fetch from web" using Pollinations (Flux Realism model)
+    const successfulScenes = sceneBlueprints.map((blueprint: any) => {
+        const enhancedPrompt = `realistic photograph, 8k, highly detailed, ${blueprint.image_prompt}`;
+        const encodedPrompt = encodeURIComponent(enhancedPrompt);
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&model=flux-realism&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
+        
+        return {
+            narration: blueprint.narration,
+            imageUrl: imageUrl
+        };
+    });
     
     return successfulScenes;
 };
@@ -1005,24 +1151,17 @@ export const generateFullChapterSummaryVideo = async (sourceText: string, langua
     
     const sceneBlueprints = JSON.parse(response.text);
 
-    const successfulScenes: VisualExplanationScene[] = [];
-    for (const blueprint of sceneBlueprints) {
-        try {
-            const imageResponse: GenerateImagesResponse = await withTimeout(ai!.models.generateImages({
-                model: 'imagen-3.0-generate-002',
-                prompt: blueprint.image_prompt,
-                config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
-            }), 60000, 'Summary Image Generation');
-             if (imageResponse.generatedImages && imageResponse.generatedImages.length > 0) {
-                 successfulScenes.push({
-                     narration: blueprint.narration,
-                     imageBytes: imageResponse.generatedImages[0].image.imageBytes,
-                 });
-             }
-        } catch (imgErr) {
-            console.error("Skipping a failed image generation for summary video:", imgErr);
-        }
-    }
+    // Construct high-quality image URLs mimicking "fetch from web" using Pollinations (Flux Realism model)
+    const successfulScenes = sceneBlueprints.map((blueprint: any) => {
+        const enhancedPrompt = `realistic photograph, 8k, highly detailed, ${blueprint.image_prompt}`;
+        const encodedPrompt = encodeURIComponent(enhancedPrompt);
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&model=flux-realism&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
+        
+        return {
+            narration: blueprint.narration,
+            imageUrl: imageUrl
+        };
+    });
     
     return successfulScenes;
 };
@@ -1059,5 +1198,185 @@ export const generateGameLevel = async (sourceText: string): Promise<GameLevel> 
         },
     }), 180000, 'Game Level Generation');
 
+    return JSON.parse(response.text);
+};
+
+export const generateLabExperiment = async (subject: Subject, topic: string, safetyLevel: 'School Lab' | 'Advanced'): Promise<LabExperiment> => {
+    checkAiService();
+    checkAndDeductTokens(15);
+    const prompt = `Design a lab experiment for a student.
+    - Subject: ${subject}
+    - Topic: ${topic}
+    - Safety Level: ${safetyLevel}
+    Provide a clear title, objective, hypothesis, list of materials, step-by-step procedure, and safety precautions.`;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: labExperimentSchema,
+        },
+    }), 120000, 'Lab Experiment Generation');
+    
+    return JSON.parse(response.text);
+};
+
+export const createHistoricalChatSession = (figure: string): Chat => {
+    checkAiService();
+    const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are embodying the historical figure: ${figure}. You must answer all questions from the perspective, knowledge, and personality of ${figure}. Be engaging, informative, and stay in character. Do not reveal you are an AI.`;
+
+    return ai!.chats.create({
+        model: "gemini-2.5-flash",
+        config: {
+            systemInstruction
+        }
+    });
+};
+
+export const analyzeLiteraryText = async (text: string): Promise<LiteraryAnalysis> => {
+    checkAiService();
+    checkAndDeductTokens(15);
+    const prompt = `Analyze the following literary text. Identify its title, author (if mentioned or obvious), major themes, literary devices with examples from the text, a summary, and an analysis of key characters.
+    ---TEXT---
+    ${text}
+    ---END TEXT---`;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: literaryAnalysisSchema,
+        },
+    }), 120000, 'Literary Analysis');
+    
+    return JSON.parse(response.text);
+};
+
+export const generateAnalogies = async (concept: string): Promise<Analogy[]> => {
+    checkAiService();
+    checkAndDeductTokens(10);
+    const prompt = `Generate 2-3 simple, relatable analogies to explain the concept of "${concept}". For each analogy, provide the analogy itself and a brief explanation of how it relates to the concept.`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: analogiesSchema,
+        },
+    }), 60000, 'Analogy Generation');
+
+    return JSON.parse(response.text);
+};
+
+export const createDilemmaChatSession = (topic: string): Chat => {
+    checkAiService();
+    const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are an ethics professor moderating a discussion on an ethical dilemma.
+    Your role is to present a challenging scenario related to the topic of "${topic}".
+    After the user responds, you must challenge their reasoning, present counter-arguments, and explore the nuances and consequences of their decision.
+    Your goal is to encourage critical thinking, not to provide a "correct" answer. Remain neutral and facilitate a deep exploration of the moral landscape.`;
+
+    return ai!.chats.create({
+        model: "gemini-2.5-flash",
+        config: {
+            systemInstruction
+        }
+    });
+};
+
+export const exploreWhatIfHistory = async (scenario: string): Promise<string> => {
+    checkAiService();
+    checkAndDeductTokens(12);
+    const prompt = `You are a historian specializing in counterfactual history.
+    A student has proposed the following "what if" scenario: "${scenario}".
+    Based on historical principles, cause and effect, and known facts up to the point of divergence, provide a detailed and plausible exploration of how history might have unfolded differently.
+    Discuss immediate consequences, long-term impacts on society, technology, politics, and culture.
+    Structure your answer in a clear, narrative format. Use headings.`;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] },
+    }), 120000, 'What If History Exploration');
+    
+    return response.text;
+};
+
+export const predictExamPaper = async (sourceText: string, difficulty: 'Easy' | 'Medium' | 'Hard', totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
+    checkAiService();
+    checkAndDeductTokens(25);
+    const prompt = `You are an AI that predicts exam papers in the style of the Indian CBSE board. Based on the following source material, predict a question paper.
+    - Subject: ${subject || 'General'}
+    - Source Material: Use the provided text to identify important topics and generate relevant questions.
+    - Difficulty: ${difficulty}
+    - Total Marks: ${totalMarks}
+    Analyze the material to determine the most probable questions and their weightage. Create a realistic paper with a mix of MCQs, short answer, and long answer questions, reflecting the importance of each topic. Include model answers for each question.
+    ${STUBRO_PERSONALITY_PROMPT}
+    ---SOURCE MATERIAL---
+    ${sourceText}
+    ---END SOURCE MATERIAL---`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-pro",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: questionPaperSchema,
+        },
+    }), 180000, 'Exam Paper Prediction');
+    
+    return JSON.parse(response.text);
+};
+
+export const findRealWorldApplications = async (concept: string): Promise<RealWorldApplication[]> => {
+    checkAiService();
+    checkAndDeductTokens(10);
+    const prompt = `For the academic concept "${concept}", find and describe 3-5 interesting real-world applications across different industries. For each, specify the industry and provide a clear description of how the concept is applied.`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: realWorldApplicationsSchema,
+            tools: [{ googleSearch: {} }]
+        },
+    }), 120000, 'Real World Application Finder');
+
+    return JSON.parse(response.text);
+};
+
+export const generateLearningPath = async (topic: string, subject: Subject, classLevel: ClassLevel, answeredQuestions: QuizQuestion[]): Promise<LearningPath> => {
+    checkAiService();
+    checkAndDeductTokens(20);
+    const quizAnalysis = answeredQuestions.map(q => ({
+        question: q.question,
+        userAnswer: q.userAnswer,
+        isCorrect: q.isCorrect,
+    }));
+    
+    const prompt = `A ${classLevel} student studying the Indian CBSE curriculum took a diagnostic quiz on the topic of "${topic}" in the subject of "${subject}".
+    Here are their results:
+    ${JSON.stringify(quizAnalysis, null, 2)}
+
+    Based on the questions they got wrong, identify their weak areas.
+    Then, create a personalized, step-by-step learning path to help them master the main topic.
+    The plan MUST be suitable for a ${classLevel} student.
+    Each step should have a clear topic, a specific goal, and a list of suggested resources or actions.
+    The suggested resources should be appropriate for their level (e.g., suggest NCERT textbook chapters, relevant YouTube channels for Indian students, or general concepts to search for, not specific university-level textbooks).
+    ${STUBRO_PERSONALITY_PROMPT}
+    `;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: learningPathSchema,
+        },
+    }), 180000, 'Personalized Learning Path Generation');
+    
     return JSON.parse(response.text);
 };

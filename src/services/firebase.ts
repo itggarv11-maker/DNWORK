@@ -1,8 +1,8 @@
-import { initializeApp, getApp, getApps } from "https://esm.sh/firebase/app";
-import { initializeAuth, browserLocalPersistence } from "https://esm.sh/firebase/auth";
+
+import { initializeApp, getApps, getApp } from 'https://esm.sh/firebase/app';
+import { getAuth, initializeAuth, browserLocalPersistence } from 'https://esm.sh/firebase/auth';
 
 // IMPORTANT: Replace these with your actual Firebase project configuration.
-// You can get them from your Firebase project settings (Project settings > General).
 const firebaseConfig = {
   apiKey: "AIzaSyD0se3ss2CELT7Li2kP_1-T-bM-ZkF_5Xk",
   authDomain: "itg-blogs.firebaseapp.com",
@@ -16,27 +16,26 @@ const firebaseConfig = {
 // Check if the essential Firebase config keys are still placeholders.
 export const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && firebaseConfig.projectId !== "YOUR_PROJECT_ID_HERE";
 
-let auth = null;
+let auth: any = null;
 
 if (isFirebaseConfigured) {
   try {
-    let app;
-    if (!getApps().length) {
-      app = initializeApp(firebaseConfig);
-    } else {
-      app = getApp();
-    }
-    // Explicitly initialize auth with local persistence. This can help prevent
-    // "auth/network-request-failed" errors in environments where IndexedDB 
-    // access might be restricted (e.g., some privacy modes or browser settings).
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    
+    // Use initializeAuth with explicit persistence to avoid "auth not registered" timing issues in some bundlers
     auth = initializeAuth(app, {
       persistence: browserLocalPersistence
     });
-  } catch (error) {
-    console.error("Firebase initialization failed:", error);
+  } catch (error: any) {
+      // If auth is already initialized (hot reload), get the existing instance
+      if (error.code === 'auth/already-initialized') {
+          auth = getAuth();
+      } else {
+          console.error("Firebase initialization failed:", error);
+      }
   }
 } else {
-  console.warn("Firebase is not configured. Authentication features will be disabled. Please add your Firebase project configuration to services/firebase.ts to enable them.");
+  console.warn("Firebase is not configured. Authentication features will be disabled.");
 }
 
 export { auth };

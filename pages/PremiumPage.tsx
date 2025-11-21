@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useEffect, useState } from 'react';
 import { Link } from 'https://esm.sh/react-router-dom';
 import Card from '../components/common/Card';

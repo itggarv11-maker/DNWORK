@@ -1,36 +1,18 @@
+
 import { GoogleGenAI, Type, Chat, GenerateContentResponse, GenerateImagesResponse } from "@google/genai";
 import { 
     QuizQuestion, Subject, ClassLevel, WrittenFeedback, QuestionPaper, GradedPaper, 
     Flashcard, QuizDifficulty, MindMapNode, StudyPlan, QuizHistoryItem, 
     CareerInfo, VisualExplanationScene, DebateTurn, DebateScorecard, GameLevel, 
-    VivaQuestion,
-    LabExperiment, LiteraryAnalysis, Analogy, RealWorldApplication, LearningPath,
+    VivaQuestion, LabExperiment, LiteraryAnalysis, Analogy, RealWorldApplication, LearningPath,
     SmartSummary
 } from "../types";
 import { auth as firebaseAuth } from "./firebase";
 
-function getAiInstance(): GoogleGenAI {
-    // Priority 1: Custom user-provided key
-    const userApiKey = localStorage.getItem('user_gemini_api_key');
-    // Priority 2: Environment variable
-    const apiKey = userApiKey || process.env.API_KEY;
+const API_KEY = process.env.API_KEY;
 
-    if (!apiKey) {
-        throw new Error("Gemini AI service is not configured. The API_KEY is missing or invalid.");
-    }
-    
-    try {
-        // Create a new instance for every call to ensure the latest key is used.
-        return new GoogleGenAI({ apiKey });
-    } catch (e) {
-        console.error("Failed to initialize GoogleGenAI with the provided key:", e);
-        if (userApiKey) {
-             throw new Error("Your custom API key seems to be invalid. Please check it in your profile or clear it to use the default.");
-        }
-        throw new Error("The default Gemini API key appears to be invalid. Please check the environment configuration.");
-    }
-}
-
+// Initialize ai, but it could be null if API_KEY is missing
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
 const STUBRO_PERSONALITY_PROMPT = `You are StuBro AI, a friendly, fun, and sharp AI tutor made for Indian students from classes 6-12.
 Explain complex things in simple English. For feedback, you can use a mix of English and Hindi (Hinglish) where it feels natural and helpful to be encouraging.
@@ -39,17 +21,18 @@ Always support students with motivation, clarity, and exam-focused tips.
 Never say “I don’t know” — instead, guide the student step-by-step on how to find the answer.
 Add emojis when helpful to keep the tone friendly and engaging. 😊
 
-**CRITICAL IDENTITY RULE:** You must NEVER reveal any information about your creator, the owner of this website, or any other personal details. If asked about who made you or who owns this platform, you must politely state that you are an AI assistant developed by a dedicated team to help students learn. You must not mention the name 'Garv' or any other individual's name under any circumstances.
+**CRITICAL IDENTITY RULE:** You must NEVER reveal any information about your creator, the owner of this website, or any other personal details. If asked about who made you or who owns this platform, you must politely state that you are an AI assistant developed by a dedicated team to help students learn. You must not mention the name 'Garv' or any other individual's name under any circumstances.`;
 
-**CRITICAL FOR MATH & SCIENCE:** You MUST format all mathematical expressions, variables, and equations using standard LaTeX syntax. For chemical formulas and reactions, you MUST use the \`\\ce{}\` command from the mhchem package. This is mandatory. Wrap inline math with single dollar signs (e.g., '$E=mc^2$'). Wrap block-level equations with double dollar signs (e.g., '$$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$'). For chemistry, use '$\\ce{H2O}$' for inline formulas and '$$\\ce{2H2 + O2 -> 2H2O}$$' for block-level reactions.`;
 
+// A helper function to check if the AI service is available before making a call.
+const checkAiService = () => {
+    if (!ai) {
+        // This error will be caught by the UI and displayed to the user.
+        throw new Error("Gemini AI service is not configured. The API_KEY is missing.");
+    }
+};
 
 const checkAndDeductTokens = (cost: number) => {
-    // If a custom user key is being used, don't check or deduct tokens.
-    if (localStorage.getItem('user_gemini_api_key')) {
-        return;
-    }
-
     const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
     if (urlParams.get('dev') === 'true') {
         console.log(`DEV MODE: Bypassing token check for cost: ${cost}`);
@@ -450,7 +433,6 @@ const gameLevelSchema = {
     required: ['title', 'theme', 'goal', 'player_start', 'grid', 'interactions']
 };
 
-// FIX: Add schemas for new AI tools
 const labExperimentSchema = {
     type: Type.OBJECT,
     properties: {
@@ -545,7 +527,7 @@ const learningPathSchema = {
 
 
 export const fetchYouTubeTranscript = async (url: string): Promise<string> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(10);
     const prompt = `Please fetch the full transcript of the YouTube video at this URL: ${url}. If a transcript is available, return only the text content. If you cannot find a transcript, return the text "Could not fetch transcript."`;
 
@@ -563,7 +545,7 @@ export const fetchYouTubeTranscript = async (url: string): Promise<string> => {
 };
 
 export const fetchChapterContent = async (classLevel: ClassLevel, subject: Subject, chapterInfo: string, chapterDetails: string): Promise<string> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(8);
     const prompt = `You are an expert content retriever. Your goal is to find and provide a comprehensive, well-structured, and detailed explanation of a specific academic chapter suitable for a student.
 
@@ -590,7 +572,7 @@ export const fetchChapterContent = async (classLevel: ClassLevel, subject: Subje
 };
 
 export const createChatSession = (subject: Subject, classLevel: ClassLevel, extractedText: string): Chat => {
-    const ai = getAiInstance();
+    checkAiService();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}
 
 The user is in ${classLevel} studying ${subject}. They have provided the following notes. Base all your answers on these notes unless the user asks for more general information.
@@ -608,13 +590,13 @@ ${extractedText.substring(0, 8000)}
 };
 
 export const sendMessageStream = async (chat: Chat, message: string) => {
-    getAiInstance(); // This just checks for a valid key before deducting tokens
+    checkAiService();
     checkAndDeductTokens(1);
     return chat.sendMessageStream({ message });
 };
 
 export const generateQuiz = async (subject: Subject, classLevel: ClassLevel, sourceText: string, numQuestions: number, difficulty: QuizDifficulty, questionType: string): Promise<QuizQuestion[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(Number(numQuestions) * 1.5);
     const prompt = `Based on the following text about ${subject} for ${classLevel}, generate a quiz with ${numQuestions} questions.
     The difficulty should be ${difficulty}.
@@ -639,7 +621,7 @@ export const generateQuiz = async (subject: Subject, classLevel: ClassLevel, sou
 };
 
 export const generateSmartSummary = async (subject: Subject, classLevel: ClassLevel, sourceText: string): Promise<SmartSummary> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(8);
     const prompt = `You are an expert at creating engaging and effective study materials for Indian CBSE students.
     Analyze the following text on ${subject} for a ${classLevel} student and generate a "Smart Summary".
@@ -664,8 +646,23 @@ export const generateSmartSummary = async (subject: Subject, classLevel: ClassLe
     return JSON.parse(response.text);
 };
 
+export const generateSummary = async (subject: Subject, classLevel: ClassLevel, sourceText: string): Promise<string> => {
+    checkAiService();
+    checkAndDeductTokens(5);
+    const prompt = `${STUBRO_PERSONALITY_PROMPT}\n\nPlease create a concise, well-structured summary of the following text on ${subject} for a ${classLevel} student. Use headings, bullet points, and bold text to make it easy to read.
+    ---TEXT---
+    ${sourceText}
+    ---END TEXT---`;
+    
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+    }), 60000, 'Summary Generation');
+    return response.text;
+};
+
 export const generateFlashcards = async (sourceText: string): Promise<Flashcard[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(10);
     const prompt = `Based on the following text, create a set of flashcards with terms, definitions, and an optional learning tip or mnemonic.
     ${STUBRO_PERSONALITY_PROMPT}
@@ -687,7 +684,7 @@ export const generateFlashcards = async (sourceText: string): Promise<Flashcard[
 };
 
 export const evaluateWrittenAnswer = async (sourceText: string, question: string, answer: string): Promise<WrittenFeedback> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(3);
     const prompt = `Based on the source text, evaluate the student's written answer to the question.
     ${STUBRO_PERSONALITY_PROMPT}
@@ -711,7 +708,7 @@ export const evaluateWrittenAnswer = async (sourceText: string, question: string
 };
 
 export const evaluateWrittenAnswerFromImages = async (sourceText: string, question: string, imageParts: { inlineData: { mimeType: string; data: string; } }[]): Promise<WrittenFeedback> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(4);
     const textPart = { text: `The student was asked this question: "${question}" based on the provided study material. They have submitted the attached image(s) as their answer. Please evaluate it and provide feedback. Grade it out of 5. ${STUBRO_PERSONALITY_PROMPT}` };
     
@@ -728,7 +725,7 @@ export const evaluateWrittenAnswerFromImages = async (sourceText: string, questi
 };
 
 export const evaluateSpokenAnswerForQuiz = async (sourceText: string, question: string, audioPart: { inlineData: { mimeType: string; data: string; } }): Promise<{ transcription: string; feedback: WrittenFeedback; }> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(4);
     const textPart = { text: `A student was asked this question during a quiz: "${question}". They responded with the attached audio. First, transcribe their answer. Then, evaluate the transcribed answer for correctness and provide feedback based on the study material. Grade it out of 5. ${STUBRO_PERSONALITY_PROMPT}` };
     const schema = {
@@ -753,7 +750,7 @@ export const evaluateSpokenAnswerForQuiz = async (sourceText: string, question: 
 };
 
 export const generateQuestionPaper = async (sourceText: string, numQuestions: number, questionTypes: string, difficulty: string, totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(20);
     const prompt = `Create a question paper for a student.
     - Subject: ${subject || 'General'}
@@ -782,7 +779,7 @@ export const generateQuestionPaper = async (sourceText: string, numQuestions: nu
 };
 
 export const gradeAnswerSheet = async (paperText: string, imageParts: { inlineData: { mimeType: string; data: string; } }[]): Promise<GradedPaper> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(30);
     const prompt = `You are an AI examiner. You have been given a question paper with model answers, and a student's handwritten answer sheet as images. Your task is to:
     1. Transcribe the student's answer for each question.
@@ -811,7 +808,7 @@ export const gradeAnswerSheet = async (paperText: string, imageParts: { inlineDa
 };
 
 export const generateCareerGuidance = async (interests: string, strengths: string, ambitions: string, financial: string, other: string): Promise<CareerInfo> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(20);
     const prompt = `You are an expert career counselor for Indian students. Based on the following profile, provide comprehensive career guidance.
     - Interests: ${interests}
@@ -835,7 +832,7 @@ export const generateCareerGuidance = async (interests: string, strengths: strin
 };
 
 export const generateStudyPlan = async (goal: string): Promise<StudyPlan> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(15);
     const prompt = `Create a detailed, day-by-day study plan for a student with the following goal: "${goal}".
     The plan should be realistic, including specific topics for each day, clear goals, and suggested time slots (e.g., Morning, Afternoon).
@@ -854,7 +851,7 @@ export const generateStudyPlan = async (goal: string): Promise<StudyPlan> => {
 };
 
 export const generateMindMap = async (topic: string, classLevel: ClassLevel): Promise<MindMapNode> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(15);
     const prompt = `Generate a hierarchical mind map for the topic "${topic}" suitable for a ${classLevel} student.
     The main node should be the topic itself. It should have several key sub-topics as children. Each of these sub-topics can have further children, going up to 3-4 levels deep.
@@ -873,7 +870,7 @@ export const generateMindMap = async (topic: string, classLevel: ClassLevel): Pr
 };
 
 export const generateMindMapFromText = async (sourceText: string, classLevel: ClassLevel): Promise<MindMapNode> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(15);
     const prompt = `Generate a hierarchical mind map from the provided text, suitable for a ${classLevel} student.
     Identify the main topic from the text to be the root node. Then, identify key sub-topics as children. Each of these sub-topics can have further children, going up to 3-4 levels deep.
@@ -895,7 +892,7 @@ export const generateMindMapFromText = async (sourceText: string, classLevel: Cl
 };
 
 export const generateVivaQuestions = async (topic: string, classLevel: ClassLevel, numQuestions: number): Promise<string[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(numQuestions);
     const prompt = `You are an examiner preparing for a viva (oral exam).
     Topic: ${topic}
@@ -919,7 +916,7 @@ export const generateVivaQuestions = async (topic: string, classLevel: ClassLeve
 };
 
 export const evaluateVivaAudioAnswer = async (question: string, audioPart: { inlineData: { mimeType: string; data: string; } }): Promise<{ transcription: string, feedback: string, marksAwarded: number }> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(4);
     const prompt = `A student was asked this question in a viva: "${question}". Their spoken answer is in the attached audio file.
     1. Transcribe the audio.
@@ -939,7 +936,7 @@ export const evaluateVivaAudioAnswer = async (question: string, audioPart: { inl
 };
 
 export const evaluateVivaTextAnswer = async (question: string, answer: string): Promise<{ transcription: string, feedback: string, marksAwarded: number }> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(3);
     const prompt = `A student was asked this question in a viva: "${question}". They typed this answer: "${answer}".
     1. For transcription, just repeat the user's typed answer.
@@ -959,7 +956,7 @@ export const evaluateVivaTextAnswer = async (question: string, answer: string): 
 };
 
 export const createLiveDoubtsSession = (topic: string, classLevel: ClassLevel): Chat => {
-    const ai = getAiInstance();
+    checkAiService();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are in a live voice-to-voice doubt clearing session. The student is from ${classLevel} and wants to discuss the topic: "${topic}". Keep your answers conversational, clear, and concise, as if you are speaking to them. Wait for their question, then respond.`;
     return ai!.chats.create({
         model: "gemini-2.5-flash",
@@ -968,7 +965,7 @@ export const createLiveDoubtsSession = (topic: string, classLevel: ClassLevel): 
 };
 
 export const sendAudioForTranscriptionAndResponse = async (chat: Chat, audioPart: { inlineData: { mimeType: string; data: string; } }): Promise<{ transcription: string, response: string }> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(2);
     const prompt = `The user has spoken their doubt, which is in the attached audio file. First, transcribe their doubt. Then, provide a spoken-style answer to their transcribed doubt. Respond in JSON with "transcription" and "response" fields.`;
     const schema = {
@@ -997,7 +994,7 @@ export const sendAudioForTranscriptionAndResponse = async (chat: Chat, audioPart
 };
 
 export const generateDebateTopics = async (sourceText: string): Promise<string[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(5);
     const prompt = `Based on the following text, generate 3-4 interesting and debatable topics or motions. The topics should be controversial or have clear opposing viewpoints. Return a simple JSON array of strings.
     ---TEXT---
@@ -1017,7 +1014,7 @@ export const generateDebateTopics = async (sourceText: string): Promise<string[]
 };
 
 export const startDebateSession = (topic: string): Chat => {
-    const ai = getAiInstance();
+    checkAiService();
     const systemInstruction = `You are "Critico," a sharp, logical, and formidable AI debate opponent. Your goal is to challenge the user and win the debate.
     - The debate topic is: "${topic}".
     - You must argue from a logical, evidence-based perspective.
@@ -1032,14 +1029,14 @@ export const startDebateSession = (topic: string): Chat => {
 };
 
 export const sendDebateArgument = async (chat: Chat, argument: string): Promise<string> => {
-    getAiInstance();
+    checkAiService();
     checkAndDeductTokens(2);
     const response = await chat.sendMessage({ message: argument });
     return response.text;
 };
 
 export const getDebateResponseToAudio = async (chat: Chat, audioPart: { inlineData: { mimeType: string; data: string; } }): Promise<{ transcription: string; rebuttal: string; }> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(3);
     const prompt = `The user has spoken their argument in the attached audio. First, transcribe it. Then, acting as Critico, provide a strong rebuttal. Respond in JSON with "transcription" and "rebuttal" fields.`;
     const schema = {
@@ -1061,7 +1058,7 @@ export const getDebateResponseToAudio = async (chat: Chat, audioPart: { inlineDa
 };
 
 export const evaluateDebate = async (history: DebateTurn[]): Promise<DebateScorecard> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(10);
     const transcript = history.map(turn => `${turn.speaker === 'user' ? 'User' : 'Critico'}: ${turn.text}`).join('\n');
     const prompt = `You are an impartial debate judge. Evaluate the user's performance in the following debate transcript. Do not evaluate Critico.
@@ -1083,7 +1080,7 @@ export const evaluateDebate = async (history: DebateTurn[]): Promise<DebateScore
 };
 
 export const breakdownTextIntoTopics = async (sourceText: string): Promise<{ title: string; content: string }[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(8);
     const prompt = `Break down the following source text into logical, distinct topics suitable for a visual explanation. Each topic should have a short, clear title and the full content related to that title. Aim for 4-8 topics.
     ---TEXT---
@@ -1100,7 +1097,7 @@ export const breakdownTextIntoTopics = async (sourceText: string): Promise<{ tit
 };
 
 export const generateScenesForTopic = async (topicContent: string, language: string, classLevel: ClassLevel): Promise<VisualExplanationScene[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(5); // cost per topic
     const prompt = `Based on the following content for a single topic, generate an array of 2-4 scenes for a visual explanation for a ${classLevel} student.
     Each scene must have:
@@ -1151,7 +1148,7 @@ export const generateScenesForTopic = async (topicContent: string, language: str
 };
 
 export const generateFullChapterSummaryVideo = async (sourceText: string, language: string, classLevel: ClassLevel): Promise<VisualExplanationScene[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(15);
     const prompt = `Based on the full chapter text, create a comprehensive summary video with 5-7 scenes for a ${classLevel} student.
     Each scene needs:
@@ -1193,7 +1190,7 @@ export const generateFullChapterSummaryVideo = async (sourceText: string, langua
 };
 
 export const generateGameLevel = async (sourceText: string): Promise<GameLevel> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(25);
     const prompt = `You are an educational game designer. Based on the provided chapter text, create a complete level for a 2D grid-based game called "Chapter Conquest".
     
@@ -1227,9 +1224,8 @@ export const generateGameLevel = async (sourceText: string): Promise<GameLevel> 
     return JSON.parse(response.text);
 };
 
-// FIX: Add functions for new AI tools to resolve errors
 export const generateLabExperiment = async (subject: Subject, topic: string, safetyLevel: 'School Lab' | 'Advanced'): Promise<LabExperiment> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(15);
     const prompt = `Design a lab experiment for a student.
     - Subject: ${subject}
@@ -1250,7 +1246,7 @@ export const generateLabExperiment = async (subject: Subject, topic: string, saf
 };
 
 export const createHistoricalChatSession = (figure: string): Chat => {
-    const ai = getAiInstance();
+    checkAiService();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are embodying the historical figure: ${figure}. You must answer all questions from the perspective, knowledge, and personality of ${figure}. Be engaging, informative, and stay in character. Do not reveal you are an AI.`;
 
     return ai!.chats.create({
@@ -1262,7 +1258,7 @@ export const createHistoricalChatSession = (figure: string): Chat => {
 };
 
 export const analyzeLiteraryText = async (text: string): Promise<LiteraryAnalysis> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(15);
     const prompt = `Analyze the following literary text. Identify its title, author (if mentioned or obvious), major themes, literary devices with examples from the text, a summary, and an analysis of key characters.
     ---TEXT---
@@ -1282,7 +1278,7 @@ export const analyzeLiteraryText = async (text: string): Promise<LiteraryAnalysi
 };
 
 export const generateAnalogies = async (concept: string): Promise<Analogy[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(10);
     const prompt = `Generate 2-3 simple, relatable analogies to explain the concept of "${concept}". For each analogy, provide the analogy itself and a brief explanation of how it relates to the concept.`;
 
@@ -1299,7 +1295,7 @@ export const generateAnalogies = async (concept: string): Promise<Analogy[]> => 
 };
 
 export const createDilemmaChatSession = (topic: string): Chat => {
-    const ai = getAiInstance();
+    checkAiService();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are an ethics professor moderating a discussion on an ethical dilemma.
     Your role is to present a challenging scenario related to the topic of "${topic}".
     After the user responds, you must challenge their reasoning, present counter-arguments, and explore the nuances and consequences of their decision.
@@ -1314,7 +1310,7 @@ export const createDilemmaChatSession = (topic: string): Chat => {
 };
 
 export const exploreWhatIfHistory = async (scenario: string): Promise<string> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(12);
     const prompt = `You are a historian specializing in counterfactual history.
     A student has proposed the following "what if" scenario: "${scenario}".
@@ -1332,7 +1328,7 @@ export const exploreWhatIfHistory = async (scenario: string): Promise<string> =>
 };
 
 export const predictExamPaper = async (sourceText: string, difficulty: 'Easy' | 'Medium' | 'Hard', totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(25);
     const prompt = `You are an AI that predicts exam papers in the style of the Indian CBSE board. Based on the following source material, predict a question paper.
     - Subject: ${subject || 'General'}
@@ -1358,7 +1354,7 @@ export const predictExamPaper = async (sourceText: string, difficulty: 'Easy' | 
 };
 
 export const findRealWorldApplications = async (concept: string): Promise<RealWorldApplication[]> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(10);
     const prompt = `For the academic concept "${concept}", find and describe 3-5 interesting real-world applications across different industries. For each, specify the industry and provide a clear description of how the concept is applied.`;
 
@@ -1376,7 +1372,7 @@ export const findRealWorldApplications = async (concept: string): Promise<RealWo
 };
 
 export const generateLearningPath = async (topic: string, subject: Subject, classLevel: ClassLevel, answeredQuestions: QuizQuestion[]): Promise<LearningPath> => {
-    const ai = getAiInstance();
+    checkAiService();
     checkAndDeductTokens(20);
     const quizAnalysis = answeredQuestions.map(q => ({
         question: q.question,

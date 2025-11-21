@@ -1,3 +1,4 @@
+
 import type { User } from 'https://esm.sh/firebase/auth';
 
 export type FirebaseUser = User;
@@ -255,7 +256,7 @@ export interface LearningStep {
     step: number;
     topic: string;
     goal: string;
-    resources: string[]; // e.g., "Read summary on...", "Take a 3-question quiz on..."
+    resources: string[];
 }
 
 export interface LearningPath {
