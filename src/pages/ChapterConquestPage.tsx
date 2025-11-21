@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'https://esm.sh/react-router-dom';
 import { GameLevel, PlayerPosition, Interaction } from '../types';
 import * as geminiService from '../services/geminiService';
+import * as userService from '../services/userService';
 import { useContent } from '../contexts/ContentContext';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
@@ -13,7 +14,7 @@ type GameState = 'generating' | 'playing' | 'interaction' | 'feedback' | 'comple
 const TILE_SIZE = 40;
 
 const ChapterConquestPage: React.FC = () => {
-    const { extractedText } = useContent();
+    const { extractedText, subject } = useContent();
     const navigate = useNavigate();
 
     const [gameState, setGameState] = useState<GameState>('generating');
@@ -50,6 +51,16 @@ const ChapterConquestPage: React.FC = () => {
         generateLevel();
     }, [extractedText, navigate]);
 
+    useEffect(() => {
+        if (gameState === 'completed' && level) {
+            userService.saveActivity('other', `Chapter Conquest: ${level.title}`, subject || 'General', {
+                score: score,
+                maxScore: level.interactions.length,
+                level: level.title
+            });
+        }
+    }, [gameState, level, score, subject]);
+
     const movePlayer = useCallback((dx: number, dy: number) => {
         if (gameState !== 'playing' || !level) return;
 
@@ -71,7 +82,6 @@ const ChapterConquestPage: React.FC = () => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (gameState !== 'playing') return;
             
-            // Prevent default scrolling for arrow keys
             if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                 e.preventDefault();
             }
@@ -87,11 +97,9 @@ const ChapterConquestPage: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [movePlayer, gameState]);
     
-    // Check for interactions or exit on player move
     useEffect(() => {
         if (gameState !== 'playing' || !level) return;
 
-        // Boundary check for safety
         if (playerPosition.y >= level.grid.length || playerPosition.x >= level.grid[0].length) return;
 
         const tile = level.grid[playerPosition.y][playerPosition.x];

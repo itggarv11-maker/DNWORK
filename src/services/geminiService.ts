@@ -35,27 +35,24 @@ const checkAiService = () => {
 const checkAndDeductTokens = (cost: number) => {
     const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
     if (urlParams.get('dev') === 'true') {
-        console.log(`DEV MODE: Bypassing token check for cost: ${cost}`);
         return;
     }
 
     const user = firebaseAuth?.currentUser;
-    if (!user) {
-        throw new Error("You must be logged in to perform this action.");
+    if (user) {
+        const tokenKey = `userTokens_${user.uid}`;
+        const currentTokens = parseInt(localStorage.getItem(tokenKey) || '0', 10);
+
+        if (currentTokens < cost) {
+            throw new Error("Insufficient tokens. Please upgrade to Premium for unlimited access.");
+        }
+
+        const newTokens = currentTokens - cost;
+        localStorage.setItem(tokenKey, newTokens.toString());
+
+        // Dispatch a custom event to notify the UI about the token change
+        window.dispatchEvent(new CustomEvent('tokenChange', { detail: { newTokens } }));
     }
-
-    const tokenKey = `userTokens_${user.uid}`;
-    const currentTokens = parseInt(localStorage.getItem(tokenKey) || '0', 10);
-
-    if (currentTokens < cost) {
-        throw new Error("Insufficient tokens. Please upgrade to Premium for unlimited access.");
-    }
-
-    const newTokens = currentTokens - cost;
-    localStorage.setItem(tokenKey, newTokens.toString());
-
-    // Dispatch a custom event to notify the UI about the token change
-    window.dispatchEvent(new CustomEvent('tokenChange', { detail: { newTokens } }));
 };
 
 
@@ -90,6 +87,16 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, context: string): Promi
 };
 
 // Schemas
+const performanceAnalysisSchema = {
+    type: Type.OBJECT,
+    properties: {
+        strengthsIdentified: { type: Type.ARRAY, items: { type: Type.STRING } },
+        weaknessesIdentified: { type: Type.ARRAY, items: { type: Type.STRING } },
+        aiFeedback: { type: Type.STRING, description: "A brief, 1-sentence summary for the next session." }
+    },
+    required: ['strengthsIdentified', 'weaknessesIdentified', 'aiFeedback']
+};
+
 const quizSchema = {
   type: Type.OBJECT,
   properties: {
@@ -571,9 +578,11 @@ export const fetchChapterContent = async (classLevel: ClassLevel, subject: Subje
     return response.text;
 };
 
-export const createChatSession = (subject: Subject, classLevel: ClassLevel, extractedText: string): Chat => {
+export const createChatSession = (subject: Subject, classLevel: ClassLevel, extractedText: string, studentContext: string = ""): Chat => {
     checkAiService();
     const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}
+
+${studentContext ? `\n${studentContext}\n` : ""}
 
 The user is in ${classLevel} studying ${subject}. They have provided the following notes. Base all your answers on these notes unless the user asks for more general information.
 ---
@@ -593,6 +602,28 @@ export const sendMessageStream = async (chat: Chat, message: string) => {
     checkAiService();
     checkAndDeductTokens(1);
     return chat.sendMessageStream({ message });
+};
+
+export const analyzeStudentPerformance = async (activityType: string, data: any): Promise<{strengthsIdentified: string[], weaknessesIdentified: string[], aiFeedback: string}> => {
+    checkAiService();
+    
+    const prompt = `Analyze this student's recent activity to update their knowledge profile.
+    Activity Type: ${activityType}
+    Data: ${JSON.stringify(data).substring(0, 5000)} 
+    
+    Output a JSON object listing strictly their Strengths (topics they know well), Weaknesses (topics they struggled with), and a 1-sentence summary for the next session.
+    If the activity doesn't provide clear evidence, return empty arrays.`;
+
+    const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: performanceAnalysisSchema
+        }
+    }), 60000, 'Performance Analysis');
+
+    return JSON.parse(response.text);
 };
 
 export const generateQuiz = async (subject: Subject, classLevel: ClassLevel, sourceText: string, numQuestions: number, difficulty: QuizDifficulty, questionType: string): Promise<QuizQuestion[]> => {
@@ -1116,17 +1147,33 @@ export const generateScenesForTopic = async (topicContent: string, language: str
     
     const sceneBlueprints = JSON.parse(response.text);
 
-    // Construct high-quality image URLs mimicking "fetch from web" using Pollinations (Flux Realism model)
-    const successfulScenes = sceneBlueprints.map((blueprint: any) => {
-        const enhancedPrompt = `realistic photograph, 8k, highly detailed, ${blueprint.image_prompt}`;
-        const encodedPrompt = encodeURIComponent(enhancedPrompt);
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&model=flux-realism&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
-        
-        return {
-            narration: blueprint.narration,
-            imageUrl: imageUrl
-        };
-    });
+    const generatedScenes = await Promise.allSettled(
+        sceneBlueprints.map(async (blueprint: { narration: string, image_prompt: string }) => {
+            const imageResponse: GenerateImagesResponse = await withTimeout(ai!.models.generateImages({
+                model: 'imagen-4.0-generate-001',
+                prompt: blueprint.image_prompt,
+                config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
+            }), 60000, 'Image Generation');
+            
+            if (!imageResponse.generatedImages || imageResponse.generatedImages.length === 0) {
+                throw new Error('Image generation failed for a scene.');
+            }
+            
+            return {
+                narration: blueprint.narration,
+                imageBytes: imageResponse.generatedImages[0].image.imageBytes,
+            };
+        })
+    );
+
+    const successfulScenes = generatedScenes
+        .filter(result => result.status === 'fulfilled')
+        .map(result => (result as PromiseFulfilledResult<VisualExplanationScene>).value);
+    
+    if(successfulScenes.length === 0 && generatedScenes.length > 0) {
+        const firstError = generatedScenes.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+        throw new Error(firstError?.reason?.message || "All image generations for the topic failed.");
+    }
     
     return successfulScenes;
 };
@@ -1151,17 +1198,24 @@ export const generateFullChapterSummaryVideo = async (sourceText: string, langua
     
     const sceneBlueprints = JSON.parse(response.text);
 
-    // Construct high-quality image URLs mimicking "fetch from web" using Pollinations (Flux Realism model)
-    const successfulScenes = sceneBlueprints.map((blueprint: any) => {
-        const enhancedPrompt = `realistic photograph, 8k, highly detailed, ${blueprint.image_prompt}`;
-        const encodedPrompt = encodeURIComponent(enhancedPrompt);
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&model=flux-realism&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
-        
-        return {
-            narration: blueprint.narration,
-            imageUrl: imageUrl
-        };
-    });
+    const successfulScenes: VisualExplanationScene[] = [];
+    for (const blueprint of sceneBlueprints) {
+        try {
+            const imageResponse: GenerateImagesResponse = await withTimeout(ai!.models.generateImages({
+                model: 'imagen-4.0-generate-001',
+                prompt: blueprint.image_prompt,
+                config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
+            }), 60000, 'Summary Image Generation');
+             if (imageResponse.generatedImages && imageResponse.generatedImages.length > 0) {
+                 successfulScenes.push({
+                     narration: blueprint.narration,
+                     imageBytes: imageResponse.generatedImages[0].image.imageBytes,
+                 });
+             }
+        } catch (imgErr) {
+            console.error("Skipping a failed image generation for summary video:", imgErr);
+        }
+    }
     
     return successfulScenes;
 };
@@ -1319,7 +1373,7 @@ export const predictExamPaper = async (sourceText: string, difficulty: 'Easy' | 
     ---END SOURCE MATERIAL---`;
 
     const response: GenerateContentResponse = await withTimeout(ai!.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents: prompt,
         config: {
             responseMimeType: "application/json",

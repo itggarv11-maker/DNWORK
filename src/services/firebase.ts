@@ -1,6 +1,7 @@
 
-import { initializeApp, getApps, getApp } from 'https://esm.sh/firebase/app';
-import { getAuth, initializeAuth, browserLocalPersistence } from 'https://esm.sh/firebase/auth';
+import { initializeApp, getApp, getApps } from "https://esm.sh/firebase/app";
+import { getAuth, initializeAuth, browserLocalPersistence } from "https://esm.sh/firebase/auth";
+import { getFirestore } from "https://esm.sh/firebase/firestore";
 
 // IMPORTANT: Replace these with your actual Firebase project configuration.
 const firebaseConfig = {
@@ -13,29 +14,32 @@ const firebaseConfig = {
   measurementId: "G-PQE2F83X50"
 };
 
-// Check if the essential Firebase config keys are still placeholders.
 export const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && firebaseConfig.projectId !== "YOUR_PROJECT_ID_HERE";
 
-let auth: any = null;
+let auth = null;
+let db = null;
 
 if (isFirebaseConfigured) {
   try {
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    let app;
+    if (!getApps().length) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      app = getApp();
+    }
     
-    // Use initializeAuth with explicit persistence to avoid "auth not registered" timing issues in some bundlers
     auth = initializeAuth(app, {
       persistence: browserLocalPersistence
     });
-  } catch (error: any) {
-      // If auth is already initialized (hot reload), get the existing instance
-      if (error.code === 'auth/already-initialized') {
-          auth = getAuth();
-      } else {
-          console.error("Firebase initialization failed:", error);
-      }
+    
+    // Initialize Firestore
+    db = getFirestore(app);
+    
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
   }
 } else {
   console.warn("Firebase is not configured. Authentication features will be disabled.");
 }
 
-export { auth };
+export { auth, db };

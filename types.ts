@@ -1,4 +1,3 @@
-
 import type { User } from 'https://esm.sh/firebase/auth';
 
 export type FirebaseUser = User;
@@ -22,6 +21,31 @@ export type ClassLevel =
 
 export type QuestionType = 'mcq' | 'written';
 export type QuizDifficulty = 'Easy' | 'Medium' | 'Hard';
+
+// --- User History & Memory Types ---
+
+export interface KnowledgeProfile {
+  strengths: string[];
+  weaknesses: string[];
+  recentTopics: string[];
+  lastSessionSummary: string;
+}
+
+export interface UserActivity {
+  id?: string;
+  userId: string;
+  type: 'chat' | 'quiz' | 'summary' | 'flashcards' | 'mindmap' | 'exam_prediction' | 'debate' | 'visual_explanation' | 'other';
+  topic: string;
+  subject: string;
+  timestamp: any; // Firestore Timestamp or Date
+  data: any; // The full quiz result, chat transcript, etc.
+  analysis?: {
+    score?: string; // Changed to string to handle "5/10" formats
+    strengthsIdentified?: string[];
+    weaknessesIdentified?: string[];
+    aiFeedback?: string;
+  };
+}
 
 export interface WrittenFeedback {
   whatIsCorrect: string;

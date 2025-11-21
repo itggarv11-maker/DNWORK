@@ -1,6 +1,6 @@
-
 import { initializeApp, getApps, getApp } from 'https://esm.sh/firebase/app';
 import { getAuth, initializeAuth, browserLocalPersistence, setPersistence } from 'https://esm.sh/firebase/auth';
+import { getFirestore } from 'https://esm.sh/firebase/firestore';
 
 // IMPORTANT: Replace these with your actual Firebase project configuration.
 const firebaseConfig = {
@@ -17,6 +17,7 @@ const firebaseConfig = {
 export const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && firebaseConfig.projectId !== "YOUR_PROJECT_ID_HERE";
 
 let auth: any = null;
+let db: any = null;
 
 if (isFirebaseConfigured) {
   try {
@@ -25,6 +26,7 @@ if (isFirebaseConfigured) {
     // Using getAuth is safer for standard web builds than initializeAuth if no specific deps are needed.
     // However, we can set persistence explicitly if needed.
     auth = getAuth(app);
+    db = getFirestore(app);
     
     // Optional: Set persistence to local storage (browser default)
     setPersistence(auth, browserLocalPersistence).catch((error) => {
@@ -38,4 +40,4 @@ if (isFirebaseConfigured) {
   console.warn("Firebase is not configured. Authentication features will be disabled.");
 }
 
-export { auth };
+export { auth, db };

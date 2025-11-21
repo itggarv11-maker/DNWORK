@@ -23,6 +23,33 @@ export type ClassLevel =
 export type QuestionType = 'mcq' | 'written';
 export type QuizDifficulty = 'Easy' | 'Medium' | 'Hard';
 
+// --- User History & Memory Types ---
+
+export interface KnowledgeProfile {
+  strengths: string[];
+  weaknesses: string[];
+  recentTopics: string[];
+  lastSessionSummary: string;
+}
+
+export interface UserActivity {
+  id?: string;
+  userId: string;
+  type: 'chat' | 'quiz' | 'summary' | 'flashcards' | 'mindmap' | 'exam_prediction' | 'debate' | 'visual_explanation' | 'other';
+  topic: string;
+  subject: string;
+  timestamp: any; // Firestore Timestamp or Date
+  data: any; // The full quiz result, chat transcript, etc.
+  analysis?: {
+    score?: string; // Changed to string to handle "5/10" formats
+    strengthsIdentified?: string[];
+    weaknessesIdentified?: string[];
+    aiFeedback?: string;
+  };
+}
+
+// -----------------------------------
+
 export interface WrittenFeedback {
   whatIsCorrect: string;
   whatIsMissing: string;
@@ -167,8 +194,8 @@ export interface VivaQuestion {
 }
 
 export interface VisualExplanationScene {
-  imageBytes?: string; // Made optional
-  imageUrl?: string;   // Added for web URLs
+  imageBytes?: string; 
+  imageUrl?: string;   
   narration: string;
 }
 
@@ -269,9 +296,9 @@ export interface LearningPath {
 // --- History ---
 export interface WorkHistoryItem {
   id: string;
-  type: string; // e.g., 'Question Paper', 'Mind Map'
+  type: string; 
   date: string;
   title: string;
-  data: any; // The full generated object
+  data: any; 
   subject?: Subject;
 }
