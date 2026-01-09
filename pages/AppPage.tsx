@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
-import { Subject, QuizQuestion, ChatMessage, ClassLevel, Flashcard, MindMapNode, QuizDifficulty } from '../types';
+import { Subject, QuizQuestion, ChatMessage, ClassLevel, Flashcard, MindMapNode, QuizDifficulty, SmartSummary } from '../types';
 import { SUBJECTS, CLASS_LEVELS } from '../constants';
 import * as geminiService from '../services/geminiService';
 import Button from '../components/common/Button';
@@ -64,7 +64,7 @@ const AppPage: React.FC = () => {
     const [error, setError] = useState<React.ReactNode | null>(null);
 
     const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
-    const [summary, setSummary] = useState<string | null>(null);
+    const [smartSummary, setSmartSummary] = useState<SmartSummary | null>(null);
     const [flashcards, setFlashcards] = useState<Flashcard[] | null>(null);
     const [mindMapData, setMindMapData] = useState<MindMapNode | null>(null);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -184,10 +184,11 @@ const AppPage: React.FC = () => {
                     }
                     break;
                 case 'summary':
-                    if (!summary) {
+                    if (!smartSummary) {
                         setLoadingMessage('Summarizing...');
-                        const generatedSummary = await geminiService.generateSummary(subject!, classLevel, extractedText);
-                        setSummary(generatedSummary);
+                        // FIX: Corrected generateSummary to generateSmartSummary as per geminiService exports
+                        const generatedSummary = await geminiService.generateSmartSummary(subject!, classLevel, extractedText);
+                        setSmartSummary(generatedSummary);
                     }
                     break;
                 case 'flashcards':
@@ -254,7 +255,7 @@ const AppPage: React.FC = () => {
         switch(activeTool) {
             case 'chat': return <Card className="h-[60vh] flex flex-col"><div className="flex-grow overflow-y-auto p-4 space-y-4">{chatHistory.map((msg, i) => <div key={i} className={msg.role === 'user' ? 'text-right text-white' : 'text-left text-slate-300'}>{msg.text}</div>)}</div><form onSubmit={handleSendMessage} className="p-4 bg-slate-800/50 flex gap-2"><input value={userMessage} onChange={e=>setUserMessage(e.target.value)} className="flex-grow bg-slate-900 text-white p-2 rounded" /><Button type="submit">Send</Button></form></Card>;
             case 'quiz': return quiz ? <QuizComponent questions={quiz} sourceText={extractedText} subject={subject!} /> : null;
-            case 'summary': return summary && <Card><div className="prose prose-invert" dangerouslySetInnerHTML={{__html: summary.replace(/\n/g, '<br/>')}}/></Card>;
+            case 'summary': return smartSummary && <Card><div className="prose prose-invert"><h3>{smartSummary.title}</h3><p>{smartSummary.stuBroTip}</p></div></Card>;
             case 'flashcards': return flashcards && <FlashcardComponent flashcards={flashcards} />;
             case 'mindmap': return mindMapData && <div className="space-y-4"><h3 className="text-center text-white text-xl">Mind Map</h3><MindMap data={mindMapData}/></div>;
             default: return null;

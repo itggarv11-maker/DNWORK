@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { VisualExplanationScene } from '../../types';
-import * as ttsService from '../../services/ttsService';
 import Button from '../common/Button';
-import { PlayIcon } from '../icons/PlayIcon';
-import { PauseIcon } from '../icons/PauseIcon';
-import { SpeakerWaveIcon } from '../icons/SpeakerWaveIcon';
-import { SpeakerXMarkIcon } from '../icons/SpeakerXMarkIcon';
-import { ArrowsPointingOutIcon } from '../icons/ArrowsPointingOutIcon';
+import { PlayIcon, PauseIcon, SpeakerWaveIcon, SpeakerXMarkIcon, ArrowsPointingOutIcon } from '../icons';
+import { motion, AnimatePresence } from 'https://esm.sh/framer-motion';
 
 interface VisualPlayerProps {
     scenes: VisualExplanationScene[];
-    language: string; // e.g., 'en-IN', 'en-US'
+    language: string; 
     jumpToScene?: number;
     onSceneChange?: (sceneIndex: number) => void;
 }
@@ -19,9 +15,8 @@ const VisualPlayer: React.FC<VisualPlayerProps> = ({ scenes, language, jumpToSce
     const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [imageOpacity, setImageOpacity] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
-    const [volume, setVolume] = useState(1);
+    const [volume, setVolume] = useState(0.8);
     
     const playerRef = useRef<HTMLDivElement>(null);
     const progressIntervalRef = useRef<number | null>(null);
@@ -37,94 +32,68 @@ const VisualPlayer: React.FC<VisualPlayerProps> = ({ scenes, language, jumpToSce
     
     useEffect(() => {
         if (jumpToScene !== undefined && jumpToScene !== currentSceneIndex) {
-            setImageOpacity(0);
-            setTimeout(() => {
-                setCurrentSceneIndex(jumpToScene);
-                setIsPlaying(true); // Auto-play when jumping
-                setImageOpacity(1);
-            }, 300);
+            setCurrentSceneIndex(jumpToScene);
+            setIsPlaying(true);
         }
     }, [jumpToScene]);
 
-
     useEffect(() => {
         return () => {
-            ttsService.cancel();
+            window.speechSynthesis.cancel();
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
     }, []);
 
      useEffect(() => {
-        // Recalculate durations whenever scenes prop changes
         sceneDurations.current = scenes.map(s => s.narration.length * 70); 
         totalDuration.current = sceneDurations.current.reduce((sum, dur) => sum + dur, 0);
     }, [scenes]);
 
     const playScene = (sceneIndex: number, timeOffset = 0) => {
-        if (sceneIndex >= scenes.length) {
+        if (sceneIndex >= scenes.length || !('speechSynthesis' in window)) {
             setIsPlaying(false);
             return;
         }
         
+        window.speechSynthesis.cancel();
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         
         const scene = scenes[sceneIndex];
-        
-        const handleEnd = () => {
+        const utterance = new SpeechSynthesisUtterance(scene.narration);
+        utterance.volume = isMuted ? 0 : volume;
+
+        const getElapsedDuration = () => sceneDurations.current.slice(0, sceneIndex).reduce((sum, dur) => sum + dur, 0);
+
+        utterance.onstart = () => {
+             const sceneStartTime = Date.now() - timeOffset;
+             progressIntervalRef.current = window.setInterval(() => {
+                const timeInScene = Date.now() - sceneStartTime;
+                const overallElapsedTime = getElapsedDuration() + timeInScene;
+                setProgress(Math.min(100, (overallElapsedTime / totalDuration.current) * 100));
+            }, 100);
+        };
+
+        utterance.onend = () => {
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-            
             if (playerStateRef.current.isPlaying && playerStateRef.current.currentSceneIndex < scenes.length - 1) {
-                setImageOpacity(0);
-                setTimeout(() => {
-                    setCurrentSceneIndex(playerStateRef.current.currentSceneIndex + 1);
-                    setImageOpacity(1);
-                }, 400); // Cross-fade duration
+                setCurrentSceneIndex(playerStateRef.current.currentSceneIndex + 1);
             } else {
                 setIsPlaying(false);
                 setProgress(100);
             }
         };
         
-        const utterance = ttsService.speak(scene.narration, {
-            volume: isMuted ? 0 : volume,
-            onEnd: handleEnd,
-            onStart: () => {
-                 const getElapsedDuration = () => {
-                    return sceneDurations.current.slice(0, sceneIndex).reduce((sum, dur) => sum + dur, 0);
-                };
-                 const sceneStartTime = Date.now() - timeOffset;
-                 progressIntervalRef.current = window.setInterval(() => {
-                    const timeInScene = Date.now() - sceneStartTime;
-                    const overallElapsedTime = getElapsedDuration() + timeInScene;
-                    setProgress(Math.min(100, (overallElapsedTime / totalDuration.current) * 100));
-                }, 100);
-            }
-        });
-        
-        if (!utterance) {
-             console.error("Speech synthesis failed to start.");
-             setIsPlaying(false);
-        }
+        window.speechSynthesis.speak(utterance);
     };
 
     useEffect(() => {
         if (isPlaying) {
-            if (ttsService.isPaused()) {
-                ttsService.resume();
-            } else {
-                playScene(currentSceneIndex);
-            }
+            playScene(currentSceneIndex);
         } else {
-            ttsService.pause();
+            window.speechSynthesis.cancel();
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         }
-    }, [isPlaying]);
-
-    useEffect(() => {
-        if (isPlaying) {
-             playScene(currentSceneIndex);
-        }
-    }, [currentSceneIndex]);
+    }, [isPlaying, currentSceneIndex]);
 
     const handlePlayPause = () => {
         if (progress >= 100) {
@@ -134,100 +103,74 @@ const VisualPlayer: React.FC<VisualPlayerProps> = ({ scenes, language, jumpToSce
         setIsPlaying(!isPlaying);
     };
 
-    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newVolume = parseFloat(e.target.value);
-        setVolume(newVolume);
-        setIsMuted(newVolume === 0);
-    };
-    
-    const handleToggleMute = () => {
-        const newMutedState = !isMuted;
-        setIsMuted(newMutedState);
-        setVolume(newMutedState ? 0 : 0.75);
-    };
-    
-    const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!totalDuration.current) return;
-        const bar = e.currentTarget;
-        const clickPosition = e.clientX - bar.getBoundingClientRect().left;
-        const clickRatio = clickPosition / bar.clientWidth;
-        const targetTime = clickRatio * totalDuration.current;
-
-        let cumulativeDuration = 0;
-        for (let i = 0; i < scenes.length; i++) {
-            cumulativeDuration += sceneDurations.current[i];
-            if (targetTime <= cumulativeDuration) {
-                const timeIntoScene = sceneDurations.current[i] - (cumulativeDuration - targetTime);
-                
-                setImageOpacity(0);
-                setTimeout(() => {
-                    setCurrentSceneIndex(i);
-                    setImageOpacity(1);
-                    if (!isPlaying) setIsPlaying(true);
-                    else playScene(i, timeIntoScene);
-                }, 150);
-                break;
-            }
-        }
-    };
-
     const handleFullscreen = () => {
         if (!playerRef.current) return;
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            playerRef.current.requestFullscreen();
-        }
+        if (document.fullscreenElement) document.exitFullscreen();
+        else playerRef.current.requestFullscreen();
     };
 
     const currentScene = scenes[currentSceneIndex];
 
     return (
-        <div ref={playerRef} className="w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden bg-black border-4 border-slate-700">
-            <div className="relative w-full aspect-video bg-gray-900 overflow-hidden group">
-                <img
+        <div ref={playerRef} className="w-full aspect-video rounded-[2rem] overflow-hidden glass-card border-4 border-white/5 relative group">
+            <AnimatePresence mode="wait">
+                <motion.img
                     key={currentSceneIndex}
-                    src={`data:image/jpeg;base64,${currentScene.imageBytes}`}
-                    alt={`Visual for: ${currentScene.narration}`}
-                    className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ken-burns-effect"
-                    style={{ opacity: imageOpacity }}
+                    src={currentScene.imageUrl || `data:image/jpeg;base64,${currentScene.imageBytes}`}
+                    initial={{ opacity: 0, scale: 1.1 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.8 }}
+                    className="absolute inset-0 w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent transition-opacity opacity-100 group-hover:opacity-100">
-                     <div className="absolute bottom-14 left-0 right-0 p-4">
-                        <p className="text-white text-center text-sm md:text-lg font-semibold" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.8)'}}>
-                            {currentScene.narration}
-                        </p>
+            </AnimatePresence>
+            
+            {/* HUD Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/40 p-10 flex flex-col justify-between pointer-events-none">
+                <div className="flex justify-between items-start">
+                     <div className="bg-black/40 backdrop-blur-md px-4 py-1 rounded-full text-[10px] font-bold text-cyan-400 tracking-widest uppercase border border-cyan-500/20">
+                        Neural Vis: Scene {currentSceneIndex + 1}/{scenes.length}
+                     </div>
+                </div>
+
+                <div className="text-center max-w-4xl mx-auto">
+                    <motion.p 
+                        key={currentSceneIndex}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-2xl md:text-4xl font-bold text-white drop-shadow-2xl"
+                        style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                    >
+                        {currentScene.narration}
+                    </motion.p>
+                </div>
+
+                <div className="space-y-4 pointer-events-auto">
+                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden cursor-pointer" onClick={(e) => {
+                         const rect = e.currentTarget.getBoundingClientRect();
+                         const p = (e.clientX - rect.left) / rect.width;
+                         setProgress(p * 100);
+                         const idx = Math.min(scenes.length -1, Math.floor(p * scenes.length));
+                         setCurrentSceneIndex(idx);
+                    }}>
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-[0_0_10px_rgba(124,58,237,0.8)]" style={{ width: `${progress}%` }}></div>
                     </div>
-                    {/* Controls */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm">
-                        <div className="w-full bg-slate-500/50 rounded-full h-1.5 cursor-pointer" onClick={handleProgressBarClick}>
-                            <div
-                                className="bg-gradient-to-r from-violet-500 to-pink-500 h-1.5 rounded-full"
-                                style={{ width: `${progress}%` }}
-                            />
-                        </div>
-                        <div className="flex items-center justify-between mt-1 text-white">
-                             <div className="flex items-center gap-2">
-                                <button onClick={handlePlayPause} className="text-white hover:text-violet-300">
-                                    {isPlaying ? <PauseIcon className="w-8 h-8"/> : <PlayIcon className="w-8 h-8"/>}
-                                </button>
-                                 <button onClick={handleToggleMute} className="text-white hover:text-violet-300">
-                                    {isMuted || volume === 0 ? <SpeakerXMarkIcon className="w-6 h-6"/> : <SpeakerWaveIcon className="w-6 h-6"/>}
-                                </button>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.05"
-                                    value={volume}
-                                    onChange={handleVolumeChange}
-                                    className="w-20 h-1 accent-violet-500"
-                                />
-                            </div>
-                            <button onClick={handleFullscreen} className="text-white hover:text-violet-300">
-                                <ArrowsPointingOutIcon className="w-6 h-6" />
+                    <div className="flex items-center justify-between text-white/60">
+                        <div className="flex items-center gap-6">
+                            <button onClick={handlePlayPause} className="hover:text-white transition-colors">
+                                {isPlaying ? <PauseIcon className="w-10 h-10"/> : <PlayIcon className="w-10 h-10"/>}
                             </button>
+                            <button onClick={() => setIsMuted(!isMuted)} className="hover:text-white transition-colors">
+                                {isMuted ? <SpeakerXMarkIcon className="w-6 h-6"/> : <SpeakerWaveIcon className="w-6 h-6"/>}
+                            </button>
+                            <div className="hidden md:block w-32 h-1 bg-white/10 rounded-full overflow-hidden relative">
+                                <input type="range" min="0" max="1" step="0.1" value={isMuted ? 0 : volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer"/>
+                                <div className="h-full bg-white/40" style={{width: `${(isMuted ? 0 : volume) * 100}%`}}></div>
+                            </div>
                         </div>
+                        <button onClick={handleFullscreen} className="hover:text-white transition-colors">
+                            <ArrowsPointingOutIcon className="w-6 h-6"/>
+                        </button>
                     </div>
                 </div>
             </div>

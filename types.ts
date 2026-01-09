@@ -1,3 +1,4 @@
+
 import type { User } from 'https://esm.sh/firebase/auth';
 
 export type FirebaseUser = User;
@@ -190,8 +191,10 @@ export interface VivaQuestion {
     marksAwarded?: number;
 }
 
+// FIX: Harmonized VisualExplanationScene to include both imageBytes and optional imageUrl
 export interface VisualExplanationScene {
-  imageBytes: string;
+  imageBytes?: string;
+  imageUrl?: string;
   narration: string;
 }
 
@@ -297,4 +300,13 @@ export interface WorkHistoryItem {
   title: string;
   data: any; // The full generated object
   subject?: Subject;
+}
+
+// FIX: Added JSX IntrinsicElements shim to resolve 'div', 'main', etc. does not exist on type 'JSX.IntrinsicElements'.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
 }

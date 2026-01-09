@@ -11,10 +11,10 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -22,59 +22,64 @@ const LoginPage: React.FC = () => {
       await login(email, password);
       navigate('/app');
     } catch (err: any) {
-      if (err.message.includes("Firebase is not configured")) {
-        setError(err.message);
-      } else {
-        setError('Failed to log in. Please check your email and password.');
-      }
-      console.error(err);
+      setError('Invalid credentials.');
     }
     setLoading(false);
   };
 
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+        await loginWithGoogle();
+        navigate('/app');
+    } catch (err: any) {
+        setError('Google authentication failed.');
+    } finally {
+        setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
+    <div className="min-h-[70vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <Card variant="light" className="!p-8 md:!p-10">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-800">Welcome Back!</h1>
-            <p className="mt-2 text-slate-600">Log in to continue your learning journey.</p>
+        <Card variant="dark" className="!p-10 shadow-2xl border-white/5 bg-slate-900/60 backdrop-blur-3xl">
+          <div className="text-center mb-10">
+            <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">WELCOME <span className="text-violet-500">BACK</span></h1>
+            <p className="mt-3 text-slate-500 font-mono-tech text-[10px] uppercase tracking-[0.2em]">Sync with Neural Core</p>
           </div>
-          {error && <p className="bg-red-500/20 text-red-600 p-3 rounded-md text-center mb-4 text-sm font-semibold">{error}</p>}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email</label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="mt-1 block w-full px-3 py-2 bg-white/60 border border-slate-400 rounded-md shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm text-slate-900 placeholder:text-slate-500"
-              />
+          
+          <div className="space-y-6">
+            <button 
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full h-18 bg-white border border-slate-300 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all active:scale-[0.98] shadow-2xl"
+            >
+                {loading ? <Spinner colorClass="bg-violet-600" /> : (
+                    <>
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+                        <span className="text-base font-black text-slate-800 uppercase tracking-tight">Sync with Google</span>
+                    </>
+                )}
+            </button>
+
+            <div className="relative py-4">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+                <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-600 bg-transparent px-2">OR SECURE CHANNEL</div>
             </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">Password</label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="mt-1 block w-full px-3 py-2 bg-white/60 border border-slate-400 rounded-md shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm text-slate-900 placeholder:text-slate-500"
-              />
-            </div>
-            <div className="text-center pt-2">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Spinner colorClass='bg-white'/> : 'Log In'}
-              </Button>
-            </div>
-          </form>
-          <p className="mt-6 text-center text-sm text-slate-600">
-            Don't have an account?{' '}
-            <Link to="/signup" className="font-medium text-violet-600 hover:text-violet-500">
-              Sign Up
-            </Link>
+
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-5 py-5 bg-slate-950 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-white font-mono text-sm" placeholder="EMAIL_ADDRESS"/>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-5 py-5 bg-slate-950 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-white font-mono text-sm" placeholder="ACCESS_KEY"/>
+                {error && <p className="text-red-500 text-[10px] font-black uppercase text-center tracking-widest">{error}</p>}
+                <Button type="submit" className="w-full h-16 !text-lg !font-black uppercase tracking-widest shadow-2xl shadow-violet-900/40" disabled={loading}>
+                    {loading ? <Spinner colorClass="bg-white"/> : 'INITIALIZE LINK'}
+                </Button>
+            </form>
+          </div>
+
+          <p className="mt-10 text-center text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+            No access node? <Link to="/signup" className="text-violet-500 hover:underline">Register Module</Link>
           </p>
         </Card>
       </div>

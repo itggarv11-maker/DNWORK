@@ -12,7 +12,6 @@ import Spinner from '../components/common/Spinner';
 import { GavelIcon, MicrophoneIcon, PaperAirplaneIcon, StopIcon, PlayIcon, PauseIcon } from '../components/icons';
 import { useContent } from '../contexts/ContentContext';
 
-// ... (blobToBase64 helper same as before)
 const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
@@ -55,7 +54,6 @@ const LiveDebatePage: React.FC = () => {
     const [error, setError] = useState<React.ReactNode | null>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
-    // ... (useEffect for scrolling, voices, topics same as before) ...
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -94,7 +92,6 @@ const LiveDebatePage: React.FC = () => {
         }
     }, [extractedText, step]);
 
-    // ... (handlePlayPauseSpeech, handleStartDebate same as before) ...
     const handlePlayPauseSpeech = () => {
         if (ttsService.isSpeaking() && !ttsService.isPaused()) {
             ttsService.pause();
@@ -129,7 +126,6 @@ const LiveDebatePage: React.FC = () => {
         }
     };
 
-    // ... (handleSendTextArgument, handleSendAudioArgument, handleSubmitArgument, startRecording, stopRecording same as before) ...
     const handleSendTextArgument = async (argument: string) => {
         if (!argument.trim() || isAiThinking) return;
 
@@ -236,13 +232,12 @@ const LiveDebatePage: React.FC = () => {
             setScorecard(result);
             setStep('results');
             
-            // --- SAVE TO FIRESTORE ---
             const analysis = await geminiService.analyzeStudentPerformance('debate', { topic, result });
+            // FIX: Corrected argument order for saveActivity: (type, topic, subject, data, analysis)
             userService.saveActivity('debate', topic, subject || 'Debate', {
                 transcript: debateHistory,
                 scorecard: result
             }, analysis);
-            // -------------------------
 
             if (readAloud) {
                 ttsService.speak(`The debate has concluded. Here is your evaluation. You scored ${result.overallScore} out of 100.`);
@@ -265,7 +260,6 @@ const LiveDebatePage: React.FC = () => {
         }
     };
 
-    // ... (Render methods same as before) ...
     const renderSetup = () => (
         <Card variant="light" className="max-w-2xl mx-auto">
             <div className="text-center mb-8">

@@ -35,19 +35,19 @@ import WhatIfHistoryPage from './pages/WhatIfHistoryPage';
 import ExamPredictorPage from './pages/ExamPredictorPage';
 import RealWorldApplicationPage from './pages/RealWorldApplicationPage';
 import PersonalizedLearningPathPage from './pages/PersonalizedLearningPathPage';
-
+import DigitalLabPage from './pages/DigitalLabPage';
 
 const AppContent: React.FC = () => {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <Header />
-      <main className="flex-grow container mx-auto px-4 py-8">
+      <main className="flex-grow w-full py-20 px-0 md:px-0">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           
-          {/* Protected Routes */}
+          {/* Protected Routes - Note: container constraints added inside pages where needed */}
           <Route path="/app" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/new-session" element={<ProtectedRoute><NewSessionPage /></ProtectedRoute>} />
           <Route path="/question-paper" element={<ProtectedRoute><QuestionPaperPage /></ProtectedRoute>} />
@@ -61,8 +61,8 @@ const AppContent: React.FC = () => {
           <Route path="/visual-explanation" element={<ProtectedRoute><VisualExplanationPage /></ProtectedRoute>} />
           <Route path="/live-debate" element={<ProtectedRoute><LiveDebatePage /></ProtectedRoute>} />
           <Route path="/chapter-conquest" element={<ProtectedRoute><ChapterConquestPage /></ProtectedRoute>} />
+          <Route path="/digital-lab" element={<ProtectedRoute><DigitalLabPage /></ProtectedRoute>} />
           
-          {/* 9 New Tool Routes */}
           <Route path="/ai-lab-assistant" element={<ProtectedRoute><AILabAssistantPage /></ProtectedRoute>} />
           <Route path="/historical-chat" element={<ProtectedRoute><HistoricalChatPage /></ProtectedRoute>} />
           <Route path="/poetry-prose-analysis" element={<ProtectedRoute><PoetryProseAnalysisPage /></ProtectedRoute>} />
@@ -73,11 +73,10 @@ const AppContent: React.FC = () => {
           <Route path="/real-world-applications" element={<ProtectedRoute><RealWorldApplicationPage /></ProtectedRoute>} />
           <Route path="/personalized-learning-path" element={<ProtectedRoute><PersonalizedLearningPathPage /></ProtectedRoute>} />
           
-          {/* Public Routes */}
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="/premium" element={<PremiumPage />} />
+          <Route path="/contact" element={<div className="container mx-auto px-4"><ContactPage /></div>} />
+          <Route path="/about" element={<div className="container mx-auto px-4"><AboutPage /></div>} />
+          <Route path="/privacy-policy" element={<div className="container mx-auto px-4"><PrivacyPolicyPage /></div>} />
+          <Route path="/premium" element={<div className="container mx-auto px-4"><PremiumPage /></div>} />
         </Routes>
       </main>
       <Footer />
@@ -85,7 +84,6 @@ const AppContent: React.FC = () => {
     </div>
   );
 };
-
 
 const App: React.FC = () => {
   return (

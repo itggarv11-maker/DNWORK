@@ -53,6 +53,7 @@ const ChapterConquestPage: React.FC = () => {
 
     useEffect(() => {
         if (gameState === 'completed' && level) {
+            // FIX: Corrected argument order for saveActivity: (type, topic, subject, data)
             userService.saveActivity('other', `Chapter Conquest: ${level.title}`, subject || 'General', {
                 score: score,
                 maxScore: level.interactions.length,

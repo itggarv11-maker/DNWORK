@@ -1,7 +1,6 @@
 
 import React from 'react';
-// FIX: Using react-router-dom from the package instead of esm.sh for consistency.
-import { HashRouter, Route, Routes } from 'https://esm.sh/react-router-dom';
+import { HashRouter, Route, Routes, useLocation } from 'https://esm.sh/react-router-dom';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import HomePage from './pages/HomePage';
@@ -9,7 +8,7 @@ import NewSessionPage from './pages/NewSessionPage';
 import ContactPage from './pages/ContactPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import QuestionPaperPage from './pages/QuestionPaperPage';
 import ProfilePage from './pages/ProfilePage';
@@ -37,19 +36,44 @@ import WhatIfHistoryPage from './pages/WhatIfHistoryPage';
 import ExamPredictorPage from './pages/ExamPredictorPage';
 import RealWorldApplicationPage from './pages/RealWorldApplicationPage';
 import PersonalizedLearningPathPage from './pages/PersonalizedLearningPathPage';
-
+import DigitalLabPage from './pages/DigitalLabPage';
+import Spinner from './components/common/Spinner';
 
 const AppContent: React.FC = () => {
+  const location = useLocation();
+  const { loading } = useAuth();
+
+  // Hide footer on app-related pages for a cleaner interface
+  const hideFooterRoutes = [
+    '/app', '/new-session', '/question-paper', '/profile', 
+    '/career-guidance', '/study-planner', '/mind-map', 
+    '/gemini-live', '/viva', '/visual-explanation', 
+    '/live-debate', '/chapter-conquest', '/digital-lab',
+    '/ai-lab-assistant', '/historical-chat', '/poetry-prose-analysis',
+    '/concept-analogy', '/ethical-dilemma', '/what-if-history',
+    '/exam-predictor', '/real-world-applications', '/personalized-learning-path'
+  ];
+  
+  const isAppPage = hideFooterRoutes.some(path => location.pathname.startsWith(path));
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950">
+        <Spinner className="w-16 h-16" colorClass="bg-violet-600" />
+        <p className="mt-4 text-violet-400 font-mono-tech tracking-widest uppercase animate-pulse">Syncing Neural Session...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <Header />
-      <main className="flex-grow container mx-auto px-4 py-8">
+      <main className={`flex-grow w-full ${isAppPage ? 'py-10' : 'py-20'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           
-          {/* Protected Routes */}
           <Route path="/app" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/new-session" element={<ProtectedRoute><NewSessionPage /></ProtectedRoute>} />
           <Route path="/question-paper" element={<ProtectedRoute><QuestionPaperPage /></ProtectedRoute>} />
@@ -63,8 +87,8 @@ const AppContent: React.FC = () => {
           <Route path="/visual-explanation" element={<ProtectedRoute><VisualExplanationPage /></ProtectedRoute>} />
           <Route path="/live-debate" element={<ProtectedRoute><LiveDebatePage /></ProtectedRoute>} />
           <Route path="/chapter-conquest" element={<ProtectedRoute><ChapterConquestPage /></ProtectedRoute>} />
+          <Route path="/digital-lab" element={<ProtectedRoute><DigitalLabPage /></ProtectedRoute>} />
           
-          {/* 9 New Tool Routes */}
           <Route path="/ai-lab-assistant" element={<ProtectedRoute><AILabAssistantPage /></ProtectedRoute>} />
           <Route path="/historical-chat" element={<ProtectedRoute><HistoricalChatPage /></ProtectedRoute>} />
           <Route path="/poetry-prose-analysis" element={<ProtectedRoute><PoetryProseAnalysisPage /></ProtectedRoute>} />
@@ -75,19 +99,17 @@ const AppContent: React.FC = () => {
           <Route path="/real-world-applications" element={<ProtectedRoute><RealWorldApplicationPage /></ProtectedRoute>} />
           <Route path="/personalized-learning-path" element={<ProtectedRoute><PersonalizedLearningPathPage /></ProtectedRoute>} />
           
-          {/* Public Routes */}
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="/premium" element={<PremiumPage />} />
+          <Route path="/contact" element={<div className="container mx-auto px-4"><ContactPage /></div>} />
+          <Route path="/about" element={<div className="container mx-auto px-4"><AboutPage /></div>} />
+          <Route path="/privacy-policy" element={<div className="container mx-auto px-4"><PrivacyPolicyPage /></div>} />
+          <Route path="/premium" element={<div className="container mx-auto px-4"><PremiumPage /></div>} />
         </Routes>
       </main>
-      <Footer />
+      {!isAppPage && <Footer />}
       <SearchStatusIndicator />
     </div>
   );
 };
-
 
 const App: React.FC = () => {
   return (

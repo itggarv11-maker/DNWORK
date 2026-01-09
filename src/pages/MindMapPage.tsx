@@ -46,7 +46,7 @@ const MindMapPage: React.FC = () => {
                 try {
                     const data = await geminiService.generateMindMapFromText(extractedText, classLevel);
                     setMindMapData(data);
-                    // SAVE TO FIRESTORE
+                    // FIX: Corrected argument order for saveActivity: (type, topic, subject, data)
                     userService.saveActivity('mindmap', `Mind Map: ${data.term}`, subject || 'General', data);
                 } catch (err) {
                     handleApiError(err);

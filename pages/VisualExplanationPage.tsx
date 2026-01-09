@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
 import * as geminiService from '../services/geminiService';
+import * as userService from '../services/userService';
 import { useContent } from '../contexts/ContentContext';
 import { VisualExplanationScene, ClassLevel, Subject } from '../types';
 import { CLASS_LEVELS, SUBJECTS } from '../constants';
@@ -9,9 +10,7 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
 import VisualPlayer from '../components/app/VisualPlayer';
-import { CheckCircleIcon } from '../components/icons/CheckCircleIcon';
-import { XCircleIcon } from '../components/icons/XCircleIcon';
-import { VideoCameraIcon } from '../components/icons/VideoCameraIcon';
+import { CheckCircleIcon, XCircleIcon, VideoCameraIcon } from '../components/icons';
 
 type PageState = 'setup' | 'generating' | 'error';
 type TopicStatus = 'pending' | 'generating' | 'complete' | 'error';
@@ -132,10 +131,18 @@ const VisualExplanationPage: React.FC = () => {
                  setSummaryStatus('error');
             }
 
+            // FIX: Reordered arguments for saveActivity call to match (type, topic, subject, data) signature in services/userService.ts
+            if (currentScenes.length > 0) {
+                userService.saveActivity('visual_explanation', customTopic || "Visual Explanation", subject || 'General', {
+                    scenes: currentScenes,
+                    summaryScenes: summaryVideoScenes
+                });
+            }
+
             isGenerating.current = false;
         };
         processQueue();
-    }, [topics, sourceText, language, classLevel]);
+    }, [topics, sourceText, language, classLevel, customTopic, subject, summaryVideoScenes]);
 
     const handleTopicSelect = (index: number) => {
         if (topics[index].status !== 'complete' || topicSceneStarts[index] === undefined) return;

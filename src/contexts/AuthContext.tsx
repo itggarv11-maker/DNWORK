@@ -4,44 +4,40 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   UserCredential
 } from 'https://esm.sh/firebase/auth';
-import { auth as firebaseAuth, isFirebaseConfigured } from '../services/firebase';
+import { auth as firebaseAuth, isFirebaseConfigured, googleProvider } from '../services/firebase';
 import { FirebaseUser } from '../types';
+import * as userService from '../services/userService';
 
 const INITIAL_TOKENS = 100;
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
   userName: string | null;
+  isPremium: boolean;
   loading: boolean;
   tokens: number | null;
   signup: (email: string, pass: string, name: string) => Promise<UserCredential>;
   login: (email: string, pass: string) => Promise<UserCredential>;
+  loginWithGoogle: () => Promise<UserCredential>;
   logout: () => Promise<void>;
-  isFirebaseConfigured: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth error');
   return context;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-const unconfiguredError = () => Promise.reject(new Error("Firebase is not configured. Please add your project credentials in 'services/firebase.ts'."));
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [tokens, setTokens] = useState<number | null>(null);
 
@@ -51,21 +47,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
     
-    const authTimeout = setTimeout(() => {
-        console.warn("Firebase auth state check timed out after 15 seconds. Assuming no user is logged in.");
-        setLoading(false);
-    }, 15000);
-
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (user: FirebaseUser | null) => {
-      clearTimeout(authTimeout);
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       setCurrentUser(user);
-
       if (user) {
         const tokenKey = `userTokens_${user.uid}`;
-        const nameKey = `userName_${user.uid}`;
-        const storedTokens = localStorage.getItem(tokenKey);
-        const storedName = localStorage.getItem(nameKey);
-        setUserName(storedName);
+        let storedTokens = localStorage.getItem(tokenKey);
+        
+        try {
+            const profile = await userService.getUserProfile(user.uid);
+            if (profile) {
+                setUserName(profile.name);
+                setIsPremium(!!profile.isPremium);
+            } else if (user.displayName) {
+                // Handle Google users who might not have a profile yet
+                await userService.saveUserProfile(user.uid, { 
+                    name: user.displayName, 
+                    classLevel: 'Any' 
+                });
+                setUserName(user.displayName);
+            }
+        } catch (e) {}
 
         if (storedTokens === null) {
           localStorage.setItem(tokenKey, String(INITIAL_TOKENS));
@@ -76,65 +77,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         setTokens(null);
         setUserName(null);
+        setIsPremium(false);
       }
-      
       setLoading(false);
     });
 
     const handleTokenChange = (event: CustomEvent) => {
-        if (typeof event.detail.newTokens === 'number') {
-            setTokens(event.detail.newTokens);
-        }
+        if (typeof event.detail.newTokens === 'number') setTokens(event.detail.newTokens);
     };
     window.addEventListener('tokenChange', handleTokenChange as EventListener);
-
-
     return () => {
         unsubscribe();
-        clearTimeout(authTimeout);
         window.removeEventListener('tokenChange', handleTokenChange as EventListener);
     };
   }, []);
 
   const signup = async (email: string, pass: string, name: string): Promise<UserCredential> => {
-    if (!isFirebaseConfigured || !firebaseAuth) return unconfiguredError();
-    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, pass);
-    
-    const tokenKey = `userTokens_${userCredential.user.uid}`;
-    const nameKey = `userName_${userCredential.user.uid}`;
-    
-    localStorage.setItem(tokenKey, String(INITIAL_TOKENS));
-    localStorage.setItem(nameKey, name);
-
-    setTokens(INITIAL_TOKENS);
+    const cred = await createUserWithEmailAndPassword(firebaseAuth, email, pass);
+    await userService.saveUserProfile(cred.user.uid, { name, classLevel: 'Any' });
     setUserName(name);
-    return userCredential;
+    setTokens(INITIAL_TOKENS);
+    return cred;
   };
 
-  const login = (email: string, pass: string) => {
-    if (!isFirebaseConfigured || !firebaseAuth) return unconfiguredError();
-    return signInWithEmailAndPassword(firebaseAuth, email, pass);
-  };
-  
-  const logout = () => {
-    if (!isFirebaseConfigured || !firebaseAuth) return unconfiguredError() as Promise<void>;
-    return signOut(firebaseAuth);
+  const login = (email: string, pass: string) => signInWithEmailAndPassword(firebaseAuth, email, pass);
+
+  const loginWithGoogle = async () => {
+    const cred = await signInWithPopup(firebaseAuth, googleProvider);
+    return cred;
   };
 
-  const value = {
-    currentUser,
-    userName,
-    loading,
-    tokens,
-    signup,
-    login,
-    logout,
-    isFirebaseConfigured,
-  };
+  const logout = () => signOut(firebaseAuth);
 
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ currentUser, userName, isPremium, loading, tokens, signup, login, loginWithGoogle, logout }}>
+      {children}
     </AuthContext.Provider>
   );
 };

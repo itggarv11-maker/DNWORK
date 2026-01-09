@@ -1,6 +1,10 @@
 
 import { initializeApp, getApp, getApps } from "https://esm.sh/firebase/app";
-import { getAuth, initializeAuth, browserLocalPersistence } from "https://esm.sh/firebase/auth";
+import { 
+    initializeAuth, 
+    browserLocalPersistence, 
+    GoogleAuthProvider 
+} from "https://esm.sh/firebase/auth";
 import { getFirestore } from "https://esm.sh/firebase/firestore";
 
 // IMPORTANT: Replace these with your actual Firebase project configuration.
@@ -16,23 +20,19 @@ const firebaseConfig = {
 
 export const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && firebaseConfig.projectId !== "YOUR_PROJECT_ID_HERE";
 
-let auth = null;
-let db = null;
+let auth: any = null;
+let db: any = null;
+export const googleProvider = new GoogleAuthProvider();
 
 if (isFirebaseConfigured) {
   try {
-    let app;
-    if (!getApps().length) {
-      app = initializeApp(firebaseConfig);
-    } else {
-      app = getApp();
-    }
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     
+    // Use initializeAuth to explicitly set persistence
     auth = initializeAuth(app, {
       persistence: browserLocalPersistence
     });
     
-    // Initialize Firestore
     db = getFirestore(app);
     
   } catch (error) {

@@ -8,191 +8,179 @@ import {
     getDoc, 
     setDoc, 
     updateDoc, 
-    arrayUnion,
     query,
-    where,
     orderBy,
     limit,
-    getDocs
+    getDocs,
+    deleteDoc
 } from 'https://esm.sh/firebase/firestore';
-import { UserActivity, KnowledgeProfile } from '../types';
 
-// -- HELPERS --
+const getUser = () => auth?.currentUser;
 
-const getUser = () => {
-    const user = auth?.currentUser;
-    if (!user) return null;
-    return user;
-};
-
-// Utility to sanitize objects for Firestore
-// - Removes undefined (not null) fields
-// - Removes Blob objects (not supported by Firestore directly)
+/**
+ * Cleanup function to ensure Firestore only receives plain objects.
+ */
 function cleanForFirestore(obj: any): any {
   if (obj === null || obj === undefined) return null;
-  if (obj instanceof Blob) return "[Blob omitted]"; 
+  if (obj instanceof Blob) return "[Media/Binary Data]"; 
   if (typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(cleanForFirestore);
   
   const newObj: any = {};
   for (const key in obj) {
     const val = obj[key];
-    if (val !== undefined) {
+    if (val !== undefined && typeof val !== 'function') {
       newObj[key] = cleanForFirestore(val);
     }
   }
   return newObj;
 }
 
-// -- CORE FUNCTIONS --
+/**
+ * Pillar 1: Identity Profile
+ */
+export const saveUserProfile = async (userId: string, data: { name: string; classLevel: string }) => {
+    if (!db) return;
+    const profileRef = doc(db, 'users', userId);
+    await setDoc(profileRef, { 
+        ...data, 
+        updatedAt: serverTimestamp(),
+        lastActive: serverTimestamp()
+    }, { merge: true });
+};
+
+export const getUserProfile = async (userId: string) => {
+    if (!db) return null;
+    const profileRef = doc(db, 'users', userId);
+    const snap = await getDoc(profileRef);
+    return snap.exists() ? snap.data() : null;
+};
 
 /**
- * Stores any activity (Chat session, Quiz result, etc.) into Firestore
- * and triggers an update to the user's Knowledge Profile.
+ * Pillar 2: Activity Vault
+ * Centralized save function for all tools.
  */
 export const saveActivity = async (
-    type: UserActivity['type'], 
+    type: string, 
     topic: string, 
     subject: string, 
     data: any,
-    analysis?: UserActivity['analysis']
+    analysis?: any,
+    sessionId?: string | null
 ) => {
-    if (!db) return; // Firestore not initialized
+    if (!db) return;
     const user = getUser();
     if (!user) return;
 
-    // Sanitize data to prevent Firestore errors with undefined/Blobs
-    const safeData = cleanForFirestore(data);
-    const safeAnalysis = cleanForFirestore(analysis);
-
-    const activityData: Omit<UserActivity, 'id'> = {
-        userId: user.uid,
+    const activityData = {
         type,
-        topic,
-        subject,
+        topic: topic || "Neural Link",
+        subject: subject || "General",
+        sessionId: sessionId || "standalone",
         timestamp: serverTimestamp(),
-        data: safeData,
-        analysis: safeAnalysis
+        data: cleanForFirestore(data),
+        analysis: cleanForFirestore(analysis) || {}
     };
 
     try {
-        // 1. Save the raw activity log
-        const docRef = await addDoc(collection(db, 'users', user.uid, 'history'), activityData);
-        console.log("Activity saved with ID: ", docRef.id);
-
-        // 2. Update the User's Knowledge Profile if analysis is provided
-        if (safeAnalysis) {
-            await updateKnowledgeProfile(user.uid, topic, safeAnalysis);
+        const historyRef = collection(db, 'users', user.uid, 'history');
+        const docRef = await addDoc(historyRef, activityData);
+        
+        if (analysis) {
+            await updatePersonalIntelligence(user.uid, analysis);
         }
-
+        
         return docRef.id;
     } catch (e) {
-        console.error("Error adding document: ", e);
-        // We don't throw here to prevent UI crashes if DB fails
+        console.error("Cloud Save Failure: ", e);
     }
 };
 
 /**
- * Updates the user's "Brain" (Knowledge Profile) based on recent performance.
+ * Updates an existing activity (Crucial for live sessions like Chat/Viva)
  */
-const updateKnowledgeProfile = async (userId: string, topic: string, analysis: UserActivity['analysis']) => {
-    if (!db || !analysis) return;
-    
-    const profileRef = doc(db, 'users', userId, 'profile', 'academic');
-    
+export const updateActivity = async (activityId: string, data: any) => {
+    if (!db) return;
+    const user = getUser();
+    if (!user) return;
     try {
-        const docSnap = await getDoc(profileRef);
-        
-        let currentWeaknesses: string[] = [];
-        let currentStrengths: string[] = [];
-
-        if (docSnap.exists()) {
-            const data = docSnap.data() as KnowledgeProfile;
-            currentWeaknesses = data.weaknesses || [];
-            currentStrengths = data.strengths || [];
-        }
-
-        // Logic to merge new weaknesses/strengths
-        // Remove solved weaknesses from the weakness list
-        if (analysis.strengthsIdentified) {
-            currentStrengths = [...new Set([...currentStrengths, ...analysis.strengthsIdentified])];
-            currentWeaknesses = currentWeaknesses.filter(w => !analysis.strengthsIdentified?.includes(w));
-        }
-
-        // Add new weaknesses
-        if (analysis.weaknessesIdentified) {
-            currentWeaknesses = [...new Set([...currentWeaknesses, ...analysis.weaknessesIdentified])];
-            // Ensure a topic isn't in both lists (weakness takes priority if recently identified)
-            currentStrengths = currentStrengths.filter(s => !analysis.weaknessesIdentified?.includes(s));
-        }
-
-        const updateData = {
-            strengths: currentStrengths,
-            weaknesses: currentWeaknesses,
-            recentTopics: arrayUnion(topic),
-            lastSessionSummary: analysis.aiFeedback || "Keep studying!",
+        const docRef = doc(db, 'users', user.uid, 'history', activityId);
+        await updateDoc(docRef, { 
+            data: cleanForFirestore(data),
             lastUpdated: serverTimestamp()
-        };
-
-        await setDoc(profileRef, updateData, { merge: true });
-
+        });
     } catch (e) {
-        console.error("Error updating knowledge profile: ", e);
+        console.error("Failed to update cloud node:", e);
     }
 };
 
 /**
- * Retrieves the user's learning context (Strengths/Weaknesses) to inject into Gemini.
+ * Pillar 3: Personal Intelligence
  */
-export const getStudentContext = async (): Promise<string> => {
-    if (!db || !auth?.currentUser) return "";
-    
+const updatePersonalIntelligence = async (userId: string, analysis: any) => {
+    if (!db || !analysis) return;
+    const personalRef = doc(db, 'users', userId, 'personal', 'metrics');
     try {
-        const profileRef = doc(db, 'users', auth.currentUser.uid, 'profile', 'academic');
-        const docSnap = await getDoc(profileRef);
+        const docSnap = await getDoc(personalRef);
+        let strengths = docSnap.exists() ? docSnap.data().strengths || [] : [];
+        let weaknesses = docSnap.exists() ? docSnap.data().weaknesses || [] : [];
 
-        if (docSnap.exists()) {
-            const data = docSnap.data() as KnowledgeProfile;
-            
-            let context = `\n\n**RETRIEVED STUDENT MEMORY:**\n`;
-            context += `- **User Name:** ${auth.currentUser.displayName || 'Student'}\n`;
-            if (data.weaknesses && data.weaknesses.length > 0) {
-                context += `- **Current WEAKNESSES (Focus on these):** ${data.weaknesses.join(', ')}\n`;
-            }
-            if (data.strengths && data.strengths.length > 0) {
-                context += `- **Proven STRENGTHS:** ${data.strengths.join(', ')}\n`;
-            }
-            if (data.lastSessionSummary) {
-                context += `- **Last Session Note:** "${data.lastSessionSummary}"\n`;
-            }
-            context += `\nUse this memory to personalize your teaching. If they struggled with a topic before, check if they understand it now.`;
-            
-            return context;
+        if (analysis.strengthsIdentified) {
+            strengths = [...new Set([...strengths, ...analysis.strengthsIdentified])];
         }
+        if (analysis.weaknessesIdentified) {
+            weaknesses = [...new Set([...weaknesses, ...analysis.weaknessesIdentified])];
+        }
+
+        await setDoc(personalRef, {
+            strengths,
+            weaknesses,
+            lastAIFeedback: analysis.aiFeedback || "Ready for module upgrade.",
+            lastUpdated: serverTimestamp()
+        }, { merge: true });
     } catch (e) {
-        console.error("Error fetching student context", e);
+        console.error("Intelligence Update Failure: ", e);
     }
-    
-    return "";
 };
 
-/**
- * Fetches recent history for the dashboard
- */
-export const getRecentHistory = async (limitCount: number = 5) => {
-    if (!db || !auth?.currentUser) return [];
-
+export const getFullHistory = async () => {
+    const user = getUser();
+    if (!db || !user) return [];
     try {
-        const q = query(
-            collection(db, 'users', auth.currentUser.uid, 'history'),
-            orderBy('timestamp', 'desc'),
-            limit(limitCount)
-        );
-        
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (e) {
-        console.error("Error fetching history", e);
-        return [];
+        const historyRef = collection(db, 'users', user.uid, 'history');
+        const q = query(historyRef, orderBy('timestamp', 'desc'));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            date: doc.data().timestamp?.toDate().toLocaleDateString() || new Date().toLocaleDateString()
+        }));
+    } catch (e) { 
+        console.error("History sync failed:", e);
+        return []; 
     }
+};
+
+export const getPersonalMetrics = async () => {
+    const user = getUser();
+    if (!db || !user) return null;
+    try {
+        const snap = await getDoc(doc(db, 'users', user.uid, 'personal', 'metrics'));
+        return snap.exists() ? snap.data() : null;
+    } catch (e) { return null; }
+};
+
+export const getStudentContext = async (): Promise<string> => {
+    const user = getUser();
+    if (!db || !user) return "";
+    try {
+        const profile = await getUserProfile(user.uid);
+        const metrics = await getPersonalMetrics();
+        let ctx = `\n[STUDENT DATA]\n- Grade: ${profile?.classLevel || 'N/A'}\n`;
+        if (metrics) {
+            ctx += `- Strong: ${metrics.strengths?.join(', ') || 'None'}\n`;
+            ctx += `- Focus: ${metrics.weaknesses?.join(', ') || 'None'}\n`;
+        }
+        return ctx;
+    } catch (e) { return ""; }
 };

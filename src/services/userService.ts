@@ -8,228 +8,189 @@ import {
     getDoc, 
     setDoc, 
     updateDoc, 
-    arrayUnion,
     query,
-    where,
     orderBy,
     limit,
-    getDocs
+    getDocs,
+    deleteDoc
 } from 'https://esm.sh/firebase/firestore';
-import { UserActivity, KnowledgeProfile } from '../types';
 
-// -- HELPERS --
-
-const getUser = () => {
-    const user = auth?.currentUser;
-    if (!user) return null;
-    return user;
-};
+const getUser = () => auth?.currentUser;
 
 /**
- * Recursively cleans an object for Firestore storage.
- * - Removes 'undefined' values (Firestore rejects them).
- * - Converts Dates to timestamps or strings.
- * - Handles nested arrays and objects.
- * - Removes functions or prototypes.
+ * Cleanup function to ensure Firestore only receives plain objects.
  */
 function cleanForFirestore(obj: any): any {
-  if (obj === null) return null;
-  if (obj === undefined) return null;
-  
-  // Handle primitive types
+  if (obj === null || obj === undefined) return null;
+  if (obj instanceof Blob) return "[Media/Binary Data]"; 
   if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(cleanForFirestore);
   
-  // Handle Dates
-  if (obj instanceof Date) return obj.toISOString();
-  
-  // Handle Arrays
-  if (Array.isArray(obj)) {
-    return obj.map(item => cleanForFirestore(item)).filter(item => item !== null);
-  }
-  
-  // Handle Blobs (Firestore doesn't support raw Blobs well in JSON-like structs, usually better to store Ref or Base64)
-  // For this app, we'll just note it exists or skip it to prevent crash.
-  if (obj instanceof Blob) return "[Blob Data]"; 
-
-  // Handle Objects
   const newObj: any = {};
   for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const val = obj[key];
-      // Skip undefined
-      if (val === undefined) continue;
-      
-      // Recursively clean
-      const cleanVal = cleanForFirestore(val);
-      if (cleanVal !== null) {
-        newObj[key] = cleanVal;
-      }
+    const val = obj[key];
+    if (val !== undefined && typeof val !== 'function') {
+      newObj[key] = cleanForFirestore(val);
     }
   }
   return newObj;
 }
 
-// -- CORE FUNCTIONS --
+/**
+ * Pillar 1: Identity Profile
+ */
+export const saveUserProfile = async (userId: string, data: { name: string; classLevel: string }) => {
+    if (!db) return;
+    const profileRef = doc(db, 'users', userId);
+    await setDoc(profileRef, { 
+        ...data, 
+        updatedAt: serverTimestamp(),
+        lastActive: serverTimestamp()
+    }, { merge: true });
+};
+
+export const getUserProfile = async (userId: string) => {
+    if (!db) return null;
+    const profileRef = doc(db, 'users', userId);
+    const snap = await getDoc(profileRef);
+    return snap.exists() ? snap.data() : null;
+};
 
 /**
- * Stores any activity (Chat session, Quiz result, etc.) into Firestore
- * and triggers an update to the user's Knowledge Profile.
+ * Pillar 2: Activity Vault
+ * Centralized save function for all tools.
  */
 export const saveActivity = async (
-    type: UserActivity['type'], 
+    type: string, 
     topic: string, 
     subject: string, 
     data: any,
-    analysis?: UserActivity['analysis']
+    analysis?: any,
+    sessionId?: string | null
 ) => {
-    if (!db) {
-        console.warn("Firestore is not initialized. Cannot save activity.");
-        return;
-    }
+    if (!db) return;
     const user = getUser();
-    if (!user) {
-        console.warn("No user logged in. Cannot save activity.");
-        return;
-    }
-
-    // Sanitize data before sending to Firestore to prevent crashes
-    const safeData = cleanForFirestore(data);
-    const safeAnalysis = cleanForFirestore(analysis);
+    if (!user) return;
 
     const activityData = {
-        userId: user.uid,
         type,
-        topic: topic || "General",
+        topic: topic || "Neural Link",
         subject: subject || "General",
+        sessionId: sessionId || "standalone",
         timestamp: serverTimestamp(),
-        data: safeData,
-        analysis: safeAnalysis || {}
+        data: cleanForFirestore(data),
+        analysis: cleanForFirestore(analysis) || {}
     };
 
     try {
-        // 1. Save the raw activity log
-        const docRef = await addDoc(collection(db, 'users', user.uid, 'history'), activityData);
-        console.log(`[UserService] Activity saved. ID: ${docRef.id}`);
-
-        // 2. Update the User's Knowledge Profile if analysis is provided
+        const historyRef = collection(db, 'users', user.uid, 'history');
+        const docRef = await addDoc(historyRef, activityData);
+        
         if (analysis) {
-            await updateKnowledgeProfile(user.uid, topic, safeAnalysis);
+            await updatePersonalIntelligence(user.uid, analysis);
         }
-
+        
         return docRef.id;
-    } catch (e: any) {
-        console.error("Error adding document: ", e);
-        if (e.code === 'failed-precondition' && e.message.includes('index')) {
-            console.error("FIRESTORE INDEX MISSING! Click the link in the error message above to create it automatically.");
-        }
+    } catch (e) {
+        console.error("Cloud Save Failure: ", e);
     }
 };
 
 /**
- * Updates the user's "Brain" (Knowledge Profile) based on recent performance.
+ * Updates an existing activity (Crucial for live sessions like Chat/Viva)
  */
-const updateKnowledgeProfile = async (userId: string, topic: string, analysis: any) => {
-    if (!db || !analysis) return;
-    
-    const profileRef = doc(db, 'users', userId, 'profile', 'academic');
-    
+export const updateActivity = async (activityId: string, data: any) => {
+    if (!db) return;
+    const user = getUser();
+    if (!user) return;
     try {
-        const docSnap = await getDoc(profileRef);
-        
-        let currentWeaknesses: string[] = [];
-        let currentStrengths: string[] = [];
-
-        if (docSnap.exists()) {
-            const data = docSnap.data() as KnowledgeProfile;
-            currentWeaknesses = data.weaknesses || [];
-            currentStrengths = data.strengths || [];
-        }
-
-        // Logic to merge new weaknesses/strengths
-        if (analysis.strengthsIdentified && Array.isArray(analysis.strengthsIdentified)) {
-            // Add new strengths
-            currentStrengths = [...new Set([...currentStrengths, ...analysis.strengthsIdentified])];
-            // Remove these from weaknesses if they were there
-            currentWeaknesses = currentWeaknesses.filter(w => !analysis.strengthsIdentified.includes(w));
-        }
-
-        if (analysis.weaknessesIdentified && Array.isArray(analysis.weaknessesIdentified)) {
-            // Add new weaknesses
-            currentWeaknesses = [...new Set([...currentWeaknesses, ...analysis.weaknessesIdentified])];
-            // Remove these from strengths if they were there (regression)
-            currentStrengths = currentStrengths.filter(s => !analysis.weaknessesIdentified.includes(s));
-        }
-
-        const updateData = {
-            strengths: currentStrengths,
-            weaknesses: currentWeaknesses,
-            recentTopics: arrayUnion(topic),
-            lastSessionSummary: analysis.aiFeedback || "Keep studying!",
+        const docRef = doc(db, 'users', user.uid, 'history', activityId);
+        await updateDoc(docRef, { 
+            data: cleanForFirestore(data),
             lastUpdated: serverTimestamp()
-        };
-
-        await setDoc(profileRef, updateData, { merge: true });
-
+        });
     } catch (e) {
-        console.error("Error updating knowledge profile: ", e);
+        console.error("Failed to update cloud node:", e);
     }
 };
 
 /**
- * Retrieves the user's learning context (Strengths/Weaknesses) to inject into Gemini.
+ * Pillar 3: Personal Intelligence
  */
+const updatePersonalIntelligence = async (userId: string, analysis: any) => {
+    if (!db || !analysis) return;
+    const personalRef = doc(db, 'users', userId, 'personal', 'metrics');
+    try {
+        const docSnap = await getDoc(personalRef);
+        let strengths = docSnap.exists() ? docSnap.data().strengths || [] : [];
+        let weaknesses = docSnap.exists() ? docSnap.data().weaknesses || [] : [];
+
+        if (analysis.strengthsIdentified) {
+            strengths = [...new Set([...strengths, ...analysis.strengthsIdentified])];
+        }
+        if (analysis.weaknessesIdentified) {
+            weaknesses = [...new Set([...weaknesses, ...analysis.weaknessesIdentified])];
+        }
+
+        await setDoc(personalRef, {
+            strengths,
+            weaknesses,
+            lastAIFeedback: analysis.aiFeedback || "Ready for module upgrade.",
+            lastUpdated: serverTimestamp()
+        }, { merge: true });
+    } catch (e) {
+        console.error("Intelligence Update Failure: ", e);
+    }
+};
+
+export const getFullHistory = async () => {
+    const user = getUser();
+    if (!db || !user) return [];
+    try {
+        const historyRef = collection(db, 'users', user.uid, 'history');
+        const q = query(historyRef, orderBy('timestamp', 'desc'));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            date: doc.data().timestamp?.toDate().toLocaleDateString() || new Date().toLocaleDateString()
+        }));
+    } catch (e) { 
+        console.error("History sync failed:", e);
+        return []; 
+    }
+};
+
+export const getPersonalMetrics = async () => {
+    const user = getUser();
+    if (!db || !user) return null;
+    try {
+        const snap = await getDoc(doc(db, 'users', user.uid, 'personal', 'metrics'));
+        return snap.exists() ? snap.data() : null;
+    } catch (e) { return null; }
+};
+
 export const getStudentContext = async (): Promise<string> => {
-    if (!db || !auth?.currentUser) return "";
-    
+    const user = getUser();
+    if (!db || !user) return "";
     try {
-        const profileRef = doc(db, 'users', auth.currentUser.uid, 'profile', 'academic');
-        const docSnap = await getDoc(profileRef);
-
-        if (docSnap.exists()) {
-            const data = docSnap.data() as KnowledgeProfile;
-            
-            let context = `\n\n**RETRIEVED STUDENT MEMORY:**\n`;
-            context += `- **User Name:** ${auth.currentUser.displayName || 'Student'}\n`;
-            if (data.weaknesses && data.weaknesses.length > 0) {
-                context += `- **Current WEAKNESSES (Focus on these):** ${data.weaknesses.join(', ')}\n`;
-            }
-            if (data.strengths && data.strengths.length > 0) {
-                context += `- **Proven STRENGTHS:** ${data.strengths.join(', ')}\n`;
-            }
-            if (data.lastSessionSummary) {
-                context += `- **Last Session Note:** "${data.lastSessionSummary}"\n`;
-            }
-            context += `\nUse this memory to personalize your teaching. If they struggled with a topic before, check if they understand it now.`;
-            
-            return context;
+        const profile = await getUserProfile(user.uid);
+        const metrics = await getPersonalMetrics();
+        let ctx = `\n[STUDENT DATA]\n- Grade: ${profile?.classLevel || 'N/A'}\n`;
+        if (metrics) {
+            ctx += `- Strong: ${metrics.strengths?.join(', ') || 'None'}\n`;
+            ctx += `- Focus: ${metrics.weaknesses?.join(', ') || 'None'}\n`;
         }
-    } catch (e) {
-        console.error("Error fetching student context", e);
-    }
-    
-    return "";
+        return ctx;
+    } catch (e) { return ""; }
 };
 
-/**
- * Fetches recent history for the dashboard
- */
-export const getRecentHistory = async (limitCount: number = 5) => {
-    if (!db || !auth?.currentUser) return [];
-
+export const getRecentHistory = async (count: number = 5) => {
+    const user = getUser();
+    if (!db || !user) return [];
     try {
-        const q = query(
-            collection(db, 'users', auth.currentUser.uid, 'history'),
-            orderBy('timestamp', 'desc'),
-            limit(limitCount)
-        );
-        
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (e: any) {
-        console.error("Error fetching history", e);
-        if (e.code === 'failed-precondition') {
-             console.error("MISSING INDEX: Check the console link to create the required Firestore Index.");
-        }
-        return [];
-    }
-};
+        const q = query(collection(db, 'users', user.uid, 'history'), orderBy('timestamp', 'desc'), limit(count));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) { return []; }
+}

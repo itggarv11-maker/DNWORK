@@ -3,27 +3,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'https://esm.sh/react-router-dom';
 import { useContent } from '../contexts/ContentContext';
 import { useAuth } from '../contexts/AuthContext';
-import { motion } from 'https://esm.sh/framer-motion';
+import { motion, AnimatePresence } from 'https://esm.sh/framer-motion';
 import {
-    AcademicCapIcon, BookOpenIcon, BrainCircuitIcon, CalendarIcon, ChatBubbleIcon, ChatBubbleLeftRightIcon,
-    ClipboardIcon, DocumentDuplicateIcon, GavelIcon, LightBulbIcon, MicrophoneIcon, QuestIcon, RectangleStackIcon,
-    RocketLaunchIcon, VideoCameraIcon,
-    AILabAssistantIcon, HistoricalChatIcon, PoetryProseIcon, ConceptAnalogyIcon, EthicalDilemmaIcon,
-    WhatIfHistoryIcon, ExamPredictorIcon, RealWorldIcon, LearningPathIcon,
-    SparklesIcon
+    AcademicCapIcon, BookOpenIcon, BrainCircuitIcon, ChatBubbleIcon,
+    DocumentDuplicateIcon, GavelIcon, LightBulbIcon, QuestIcon, RectangleStackIcon,
+    RocketLaunchIcon, VideoCameraIcon, BeakerIcon, ExamPredictorIcon, LearningPathIcon,
+    SparklesIcon, ArrowRightIcon, MicrophoneIcon
 } from '../components/icons';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
-import { QuizQuestion, ChatMessage, Flashcard, SmartSummary, QuizDifficulty, Subject } from '../types';
+import { QuizQuestion, ChatMessage, Flashcard, SmartSummary, MindMapNode, Subject } from '../types';
 import * as geminiService from '../services/geminiService';
-import * as userService from '../services/userService'; // Use userService
+import * as userService from '../services/userService';
 import { Chat } from '@google/genai';
 import QuizComponent from '../components/app/QuizComponent';
 import FlashcardComponent from '../components/app/FlashcardComponent';
 import SmartSummaryComponent from '../components/app/SmartSummaryComponent';
 import MindMap from '../components/app/MindMap';
-import { MindMapNode } from '../types';
+import MarkdownRenderer from '../components/common/MarkdownRenderer';
 
 interface Tool {
     path: string;
@@ -31,90 +29,42 @@ interface Tool {
     title: string;
     description: string;
     requiresContent: boolean;
-    subjects?: Subject[];
     color: string; 
 }
 
 const toolCategories: { name: string; tools: Tool[] }[] = [
     {
-        name: 'Core Engine',
+        name: 'Neural Core',
         tools: [
-            { path: '/app', icon: ChatBubbleIcon, title: 'AI Chat', description: 'Deep dive into your notes with an intelligent assistant.', requiresContent: true, color: 'text-cyan-400' },
-            { path: '/app', icon: LightBulbIcon, title: 'Generate Quiz', description: 'Test your mastery with adaptive quizzes.', requiresContent: true, color: 'text-yellow-400' },
-            { path: '/app', icon: DocumentDuplicateIcon, title: 'Smart Summary', description: 'Extract concepts & exam tips instantly.', requiresContent: true, color: 'text-emerald-400' },
-            { path: '/app', icon: RectangleStackIcon, title: 'Flashcards', description: 'Active recall made effortless.', requiresContent: true, color: 'text-pink-400' },
-            { path: '/mind-map', icon: BrainCircuitIcon, title: 'Mind Map', description: 'Visualize connections in a neural network style.', requiresContent: true, color: 'text-violet-400' },
+            { path: '/app', icon: ChatBubbleIcon, title: 'Neural Chat', description: 'High-fidelity cognitive processing of your notes.', requiresContent: true, color: 'text-cyan-400' },
+            { path: '/app', icon: LightBulbIcon, title: 'Diagnostic Quiz', description: 'Adaptive testing of your neural pathways.', requiresContent: true, color: 'text-yellow-400' },
+            { path: '/app', icon: DocumentDuplicateIcon, title: 'Smart Summary', description: 'Synthesis of core concepts and formulae.', requiresContent: true, color: 'text-emerald-400' },
+            { path: '/app', icon: RectangleStackIcon, title: 'Flashcards', description: 'Rapid active recall training.', requiresContent: true, color: 'text-pink-400' },
+            { path: '/mind-map', icon: BrainCircuitIcon, title: 'Neural Map', description: '3D conceptual visualization of knowledge nodes.', requiresContent: true, color: 'text-violet-400' },
         ]
     },
     {
-        name: 'Advanced Simulations',
+        name: 'Reality Simulations',
         tools: [
-            { path: '/visual-explanation', icon: VideoCameraIcon, title: 'Visual Explanation', description: 'Turn text into narrated AI videos.', requiresContent: true, color: 'text-rose-400' },
-            { path: '/live-debate', icon: GavelIcon, title: 'Debate Arena', description: 'Challenge an AI opponent in real-time.', requiresContent: true, color: 'text-orange-400' },
-            { path: '/chapter-conquest', icon: QuestIcon, title: 'Chapter Conquest', description: 'Gamify your notes into an RPG adventure.', requiresContent: true, color: 'text-amber-400' },
-            { path: '/poetry-prose-analysis', icon: PoetryProseIcon, title: 'Literary Analyst', description: 'Deep analysis of themes and devices.', requiresContent: true, subjects: [Subject.English], color: 'text-fuchsia-400' },
-            { path: '/concept-analogy', icon: ConceptAnalogyIcon, title: 'Concept Analogy', description: 'Understand anything via simple comparisons.', requiresContent: false, color: 'text-blue-400' },
-            { path: '/real-world-applications', icon: RealWorldIcon, title: 'Real-World Apps', description: 'See how theory applies to industry.', requiresContent: false, color: 'text-green-400' },
-        ]
-    },
-    {
-        name: 'Exam & Future',
-        tools: [
-            { path: '/question-paper', icon: BookOpenIcon, title: 'Paper Generator', description: 'Create and grade custom exam papers.', requiresContent: true, color: 'text-indigo-400' },
-            { path: '/exam-predictor', icon: ExamPredictorIcon, title: 'Exam Predictor', description: 'AI predicts probable exam questions.', requiresContent: true, color: 'text-purple-400' },
-            { path: '/viva', icon: MicrophoneIcon, title: 'Viva Prep', description: 'Practice oral exams with a voice AI.', requiresContent: false, color: 'text-teal-400' },
-            { path: '/gemini-live', icon: ChatBubbleLeftRightIcon, title: 'Live Tutor', description: 'Voice conversation with an expert tutor.', requiresContent: false, color: 'text-sky-400' },
-            { path: '/study-planner', icon: CalendarIcon, title: 'Smart Planner', description: 'Adaptive schedules to reach your goals.', requiresContent: false, color: 'text-lime-400' },
-            { path: '/career-guidance', icon: RocketLaunchIcon, title: 'Career Path', description: 'AI-driven roadmap for your future.', requiresContent: false, color: 'text-red-400' },
-        ]
-    },
-    {
-        name: 'Exploration Lab',
-        tools: [
-            { path: '/ai-lab-assistant', icon: AILabAssistantIcon, title: 'Lab Assistant', description: 'Design experiments and safety protocols.', requiresContent: false, subjects: [Subject.Physics, Subject.Chemistry, Subject.Biology, Subject.Science], color: 'text-cyan-400' },
-            { path: '/historical-chat', icon: HistoricalChatIcon, title: 'History Chat', description: 'Talk to legends from the past.', requiresContent: false, subjects: [Subject.History, Subject.SST], color: 'text-amber-600' },
-            { path: '/ethical-dilemma', icon: EthicalDilemmaIcon, title: 'Ethical Dilemma', description: 'Navigate complex moral landscapes.', requiresContent: false, color: 'text-stone-400' },
-            { path: '/what-if-history', icon: WhatIfHistoryIcon, title: 'Alternate History', description: 'Explore "What If" timelines.', requiresContent: false, subjects: [Subject.History, Subject.SST], color: 'text-orange-300' },
-            { path: '/personalized-learning-path', icon: LearningPathIcon, title: 'Learning Path', description: 'Diagnostic driven study curriculum.', requiresContent: false, color: 'text-emerald-500' },
+            { path: '/digital-lab', icon: BeakerIcon, title: 'Digital Lab 3D', description: 'Hyper-realistic science simulations.', requiresContent: false, color: 'text-blue-400' },
+            { path: '/visual-explanation', icon: VideoCameraIcon, title: 'Visual Narrator', description: 'Synthetic video generation from text.', requiresContent: true, color: 'text-rose-400' },
+            { path: '/live-debate', icon: GavelIcon, title: 'Arena of Logic', description: 'Real-time argumentation against AI.', requiresContent: true, color: 'text-orange-400' },
+            { path: '/chapter-conquest', icon: QuestIcon, title: 'Chapter Odyssey', description: 'RPG-tier mastery of subject material.', requiresContent: true, color: 'text-amber-400' },
         ]
     }
 ];
 
-
 type ActiveTool = 'chat' | 'quiz' | 'summary' | 'flashcards' | 'mindmap' | 'none';
-type QuestionTypeFilter = 'mcq' | 'written' | 'both';
-
-// New component to handle markdown and math rendering in chat
-const MessageContent: React.FC<{ text: string }> = ({ text }) => {
-    const contentRef = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        if (contentRef.current && window.renderMathInElement) {
-            window.renderMathInElement(contentRef.current, {
-                delimiters: [
-                    {left: '$$', right: '$$', display: true},
-                    {left: '$', right: '$', display: false},
-                    {left: '\\(', right: '\\)', display: false},
-                    {left: '\\[', right: '\\]', display: true}
-                ],
-                throwOnError: false
-            });
-        }
-    }, [text]);
-
-    return <div ref={contentRef} className="prose prose-sm max-w-none prose-invert text-slate-200" dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br />') }} />;
-};
-
 
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
-    const { extractedText, subject, classLevel, hasSessionStarted, resetContent } = useContent();
-    const { currentUser, userName } = useAuth();
+    const { extractedText, subject, classLevel, sessionId } = useContent();
+    const { userName } = useAuth();
 
-    // State for internally-rendered tools
     const [activeTool, setActiveTool] = useState<ActiveTool>('none');
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [loadingMessage, setLoadingMessage] = useState('Processing...');
-    const [error, setError] = useState<React.ReactNode | null>(null);
+    const [loadingMessage, setLoadingMessage] = useState('Initializing...');
+    const [error, setError] = useState<string | null>(null);
 
     const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
     const [smartSummary, setSmartSummary] = useState<SmartSummary | null>(null);
@@ -122,433 +72,216 @@ const DashboardPage: React.FC = () => {
     const [mindMapData, setMindMapData] = useState<MindMapNode | null>(null);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [chatSession, setChatSession] = useState<Chat | null>(null);
+    const [chatActivityId, setChatActivityId] = useState<string | null>(null);
     const [userMessage, setUserMessage] = useState('');
     
-    const [recentHistory, setRecentHistory] = useState<any[]>([]);
-
     const [showQuizSettings, setShowQuizSettings] = useState(false);
     const [quizQuestionCount, setQuizQuestionCount] = useState<number>(5);
-    const [quizDifficulty, setQuizDifficulty] = useState<QuizDifficulty>('Medium');
-    const [quizQuestionType, setQuizQuestionType] = useState<QuestionTypeFilter>('both');
-    
-    const chatContainerRef = useRef<HTMLDivElement>(null);
-
-    // Fetch recent history on mount
-    useEffect(() => {
-        const fetchHistory = async () => {
-            const history = await userService.getRecentHistory(3);
-            setRecentHistory(history);
-        };
-        fetchHistory();
-    }, [activeTool]); // Refresh when tool changes/closes
-
-    useEffect(() => {
-        if (!hasSessionStarted) {
-            navigate('/new-session');
-        }
-    }, [hasSessionStarted, navigate]);
-
-     useEffect(() => {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [chatHistory]);
-
-    // Auto-save chat when leaving or unmounting
-    useEffect(() => {
-        return () => {
-            if (activeTool === 'chat' && chatHistory.length > 2 && subject) {
-                userService.saveActivity('chat', `Chat: ${subject}`, subject, chatHistory);
-            }
-        };
-    }, [activeTool, chatHistory, subject]);
-
-    const handleApiError = (err: unknown) => {
-        if (err instanceof Error) {
-            setError(err.message.includes("Insufficient tokens")
-                ? <span>You're out of tokens! Please <Link to="/premium" className="font-bold underline text-violet-400">upgrade to Premium</Link>.</span>
-                : err.message);
-        } else {
-            setError("An unknown error occurred.");
-        }
-        setIsLoading(false);
-    };
-
-    const handleToolSelection = async (tool: ActiveTool) => {
-        if (!extractedText && tool !== 'none') {
-            setError("Please provide content first to use this tool. You can start a new session.");
-            return;
-        }
-        
-        setActiveTool(tool);
-        setError(null);
-        
-        if (tool === 'quiz') {
-            setShowQuizSettings(true);
-            return;
-        }
-        
-        setIsLoading(true);
-
-        try {
-            switch(tool) {
-                case 'chat':
-                    if (!chatSession) {
-                        setLoadingMessage('Loading your memory...');
-                        // Get context from Firestore
-                        const context = await userService.getStudentContext();
-                        setLoadingMessage('Initializing AI session...');
-                        const session = geminiService.createChatSession(subject!, classLevel, extractedText, context);
-                        setChatSession(session);
-                        setChatHistory([{ role: 'model', text: `Hi! I've reviewed your progress and I'm ready to help with **${subject}** for **${classLevel}**. Ask me anything!` }]);
-                    }
-                    break;
-                case 'summary':
-                    if (!smartSummary) {
-                        setLoadingMessage('Creating your Smart Summary...');
-                        const generatedSummary = await geminiService.generateSmartSummary(subject!, classLevel, extractedText);
-                        setSmartSummary(generatedSummary);
-                        // Save to Firestore
-                        userService.saveActivity('summary', generatedSummary.title, subject!, generatedSummary);
-                    }
-                    break;
-                case 'flashcards':
-                    if (!flashcards) {
-                        setLoadingMessage('Generating flashcards...');
-                        const generatedFlashcards = await geminiService.generateFlashcards(extractedText);
-                        setFlashcards(generatedFlashcards);
-                        // Save to Firestore
-                        userService.saveActivity('flashcards', `Flashcards: ${subject}`, subject!, generatedFlashcards);
-                    }
-                    break;
-                case 'mindmap':
-                    if (!mindMapData) {
-                        setLoadingMessage('Generating mind map...');
-                        const data = await geminiService.generateMindMapFromText(extractedText, classLevel);
-                        setMindMapData(data);
-                        // Save to Firestore
-                        userService.saveActivity('mindmap', `Mind Map: ${data.term}`, subject!, data);
-                    }
-                    break;
-            }
-        } catch (e) {
-            handleApiError(e)
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const handleGenerateQuiz = async () => {
-        if (!subject) return;
-        setShowQuizSettings(false);
-        setIsLoading(true);
-        setLoadingMessage('Generating your quiz...');
-        setError(null);
-        try {
-            const generatedQuiz = await geminiService.generateQuiz(subject, classLevel, extractedText, quizQuestionCount, quizDifficulty, quizQuestionType);
-            setQuiz(generatedQuiz);
-        } catch (e) {
-            handleApiError(e);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!userMessage.trim() || !chatSession || isLoading) return;
-
-        const newUserMessage: ChatMessage = { role: 'user', text: userMessage };
-        setChatHistory(prev => [...prev, newUserMessage]);
-        setUserMessage('');
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            const stream = await geminiService.sendMessageStream(chatSession, userMessage);
-            let modelResponse = '';
-            setChatHistory(prev => [...prev, { role: 'model', text: '' }]);
-            
-            for await (const chunk of stream) {
-                modelResponse += chunk.text;
-                setChatHistory(prev => {
-                    const newHistory = [...prev];
-                    newHistory[newHistory.length - 1].text = modelResponse;
-                    return newHistory;
-                });
-            }
-        } catch (e) {
-            handleApiError(e);
-            setChatHistory(prev => prev.slice(0, -1));
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-     const handleGoBackToTools = () => {
-        setActiveTool('none');
-        setQuiz(null);
-        setError(null);
-    };
 
     const handleToolClick = (tool: Tool) => {
         if (tool.requiresContent && !extractedText) {
             navigate('/new-session');
             return;
         }
-
-        switch (tool.title) {
-            case 'AI Chat': handleToolSelection('chat'); break;
-            case 'Generate Quiz': handleToolSelection('quiz'); break;
-            case 'Smart Summary': handleToolSelection('summary'); break;
-            case 'Flashcards': handleToolSelection('flashcards'); break;
-            case 'Mind Map': handleToolSelection('mindmap'); break;
-            default: navigate(tool.path); break;
-        }
+        if (tool.title === 'Neural Chat') handleToolSelection('chat');
+        else if (tool.title === 'Diagnostic Quiz') handleToolSelection('quiz');
+        else if (tool.title === 'Smart Summary') handleToolSelection('summary');
+        else if (tool.title === 'Flashcards') handleToolSelection('flashcards');
+        else if (tool.title === 'Neural Map') handleToolSelection('mindmap');
+        else navigate(tool.path);
     };
 
-    // ... (Render methods ToolCard, renderQuizSettings, renderToolUI same as before) ...
-    const ToolCard: React.FC<{ tool: Tool }> = ({ tool }) => (
-        <motion.div
-            whileHover={{ scale: 1.02, y: -5 }}
-            whileTap={{ scale: 0.98 }}
-        >
-            <Card
-                onClick={() => handleToolClick(tool)}
-                variant="glass"
-                className="text-left !p-5 h-full flex flex-col relative overflow-hidden group border-slate-700/50 hover:border-violet-500/50 transition-colors duration-300 cursor-pointer"
-            >
-                <div className={`absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
-                
-                <div className="flex items-start gap-4 relative z-10">
-                    <div className={`flex-shrink-0 mt-1 rounded-xl h-12 w-12 flex items-center justify-center bg-slate-800 border border-slate-700 ${tool.color}`}>
-                        <tool.icon className="w-7 h-7" />
-                    </div>
-                    <div className="flex-grow">
-                        <h3 className="text-base font-bold text-slate-100 group-hover:text-white transition-colors">{tool.title}</h3>
-                        <p className="mt-1 text-slate-400 text-xs leading-relaxed">{tool.description}</p>
-                    </div>
-                </div>
-                {tool.requiresContent && (
-                    <div className="mt-auto pt-3 flex justify-end">
-                         <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50">Content</span>
-                    </div>
-                )}
-            </Card>
-        </motion.div>
-    );
-
-    const renderQuizSettings = () => (
-         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <Card variant="dark" className="max-w-md w-full animate-in zoom-in-95 duration-200">
-                <h3 className="text-xl font-bold mb-6 text-white text-center">Configure Quiz</h3>
-                <div className="space-y-6">
-                    <div>
-                        <label htmlFor="question-count" className="block text-sm font-medium text-slate-300 mb-2">Number of Questions</label>
-                        <div className="flex items-center gap-4">
-                            <input 
-                                type="range" 
-                                min="1" 
-                                max="15" 
-                                value={quizQuestionCount} 
-                                onChange={(e) => setQuizQuestionCount(parseInt(e.target.value))}
-                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
-                            />
-                            <span className="text-white font-bold w-8 text-center">{quizQuestionCount}</span>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Question Types</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(['mcq', 'written', 'both'] as QuestionTypeFilter[]).map((type) => (
-                                <button
-                                key={type}
-                                type="button"
-                                onClick={() => setQuizQuestionType(type)}
-                                className={`py-2 px-2 text-xs sm:text-sm font-medium rounded-lg transition-all border
-                                ${quizQuestionType === type ? 'bg-violet-600 text-white border-violet-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
-                                >
-                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
-                        <Button variant="ghost" onClick={() => { setShowQuizSettings(false); setActiveTool('none');}}>Cancel</Button>
-                        <Button variant="primary" onClick={handleGenerateQuiz}>Start Quiz</Button>
-                    </div>
-                </div>
-            </Card>
-         </div>
-    );
-
-    const renderToolUI = () => {
-        if (showQuizSettings) return renderQuizSettings();
-        if (isLoading) return (
-            <div className="flex flex-col items-center gap-4 py-20">
-                <Spinner className="w-16 h-16" colorClass="bg-violet-500" />
-                <p className="text-slate-400 animate-pulse text-lg font-medium">{loadingMessage}</p>
-            </div>
-        );
+    const handleToolSelection = async (tool: ActiveTool) => {
+        setError(null);
+        if (tool === 'quiz') {
+            setShowQuizSettings(true);
+            return;
+        }
         
-        switch(activeTool) {
-            case 'chat':
-                return (
-                    <Card variant="dark" className="h-[70vh] flex flex-col border-slate-700">
-                        <div className="flex-grow p-4 space-y-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-                            {chatHistory.map((msg, index) => (
-                            <div key={index} className={`flex items-end gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                                {msg.role === 'model' && (
-                                    <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-900/20">
-                                        <ChatBubbleIcon className="w-4 h-4 text-white" />
-                                    </div>
-                                )}
-                                <div className={`max-w-2xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-slate-800/80 border border-slate-700 text-slate-200 rounded-bl-sm'}`}>
-                                    <MessageContent text={msg.text} />
-                                </div>
-                                {msg.role === 'user' && (
-                                     <div className="flex-shrink-0 w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-                                        <span className="text-xs font-bold text-white">YOU</span>
-                                    </div>
-                                )}
-                            </div>))}
-                            <div ref={chatContainerRef} />
-                        </div>
-                        <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-700/50 bg-slate-800/30 flex gap-3">
-                            <input 
-                                type="text" 
-                                value={userMessage} 
-                                onChange={(e) => setUserMessage(e.target.value)} 
-                                placeholder="Ask a question about your content..." 
-                                className="flex-grow bg-slate-900/50 border border-slate-600 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-500"
-                            />
-                            <Button type="submit" disabled={isLoading || !userMessage.trim()} className="rounded-xl aspect-square flex items-center justify-center !p-0 w-12">
-                                <RocketLaunchIcon className="w-5 h-5 transform rotate-45" />
-                            </Button>
-                        </form>
-                    </Card>
-                );
-            case 'quiz': return quiz ? <QuizComponent questions={quiz} sourceText={extractedText} subject={subject!} /> : null;
-            case 'summary': return smartSummary && <SmartSummaryComponent summary={smartSummary} />;
-            case 'flashcards': return flashcards && <FlashcardComponent flashcards={flashcards} />;
-            case 'mindmap': return mindMapData && <div className="space-y-6"><div className="text-center"><h3 className="text-2xl font-bold text-slate-800">Mind Map</h3></div><MindMap data={mindMapData} /></div>;
-            default: return null;
+        setIsLoading(true);
+        setActiveTool(tool);
+        
+        try {
+            switch(tool) {
+                case 'chat':
+                    if (!chatSession) {
+                        const context = await userService.getStudentContext();
+                        const session = geminiService.createChatSession(subject!, classLevel, extractedText, context);
+                        setChatSession(session);
+                        const initialMsg: ChatMessage = { role: 'model', text: `Neural Link Active. Ready for analysis. Session: ${sessionId?.substring(0,8)}` };
+                        setChatHistory([initialMsg]);
+                        const id = await userService.saveActivity('chat', `Chat: ${subject}`, subject!, [initialMsg], {}, sessionId);
+                        if (id) setChatActivityId(id);
+                    }
+                    break;
+                case 'summary':
+                    setLoadingMessage('Synthesizing Summary...');
+                    const sRes = await geminiService.generateSmartSummary(subject!, classLevel, extractedText);
+                    setSmartSummary(sRes);
+                    await userService.saveActivity('summary', sRes.title, subject!, sRes, {}, sessionId);
+                    break;
+                case 'flashcards':
+                    setLoadingMessage('Generating Flashcards...');
+                    const fRes = await geminiService.generateFlashcards(extractedText);
+                    setFlashcards(fRes);
+                    await userService.saveActivity('flashcards', `Flashcards: ${subject}`, subject!, fRes, {}, sessionId);
+                    break;
+                case 'mindmap':
+                    setLoadingMessage('Mapping Connections...');
+                    const mRes = await geminiService.generateMindMapFromText(extractedText, classLevel);
+                    setMindMapData(mRes);
+                    await userService.saveActivity('mindmap', `Mindmap: ${mRes.term}`, subject!, mRes, {}, sessionId);
+                    break;
+            }
+        } catch (e: any) { 
+            setError(e.message || "Connection error."); 
+            setActiveTool('none');
+        } finally { 
+            setIsLoading(false); 
         }
     };
 
-    if (!hasSessionStarted) {
-        return <div className="flex justify-center items-center h-screen bg-slate-950"><Spinner className="w-16 h-16" colorClass="bg-violet-600" /></div>;
-    }
+    const handleGenerateQuiz = async () => {
+        setIsLoading(true);
+        setShowQuizSettings(false);
+        setActiveTool('quiz');
+        setLoadingMessage('Building Quiz...');
+        try {
+            const res = await geminiService.generateQuiz(subject!, classLevel, extractedText, quizQuestionCount, 'Medium', 'mcq');
+            if (!res || res.length === 0) throw new Error("Synthesis failed.");
+            setQuiz(res);
+        } catch (e: any) {
+            setError(e.message);
+            setActiveTool('none');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-    if (activeTool !== 'none') {
-        return (
-            <div className="max-w-5xl mx-auto">
-                <div className="mb-6 flex items-center justify-between">
-                     <Button onClick={handleGoBackToTools} variant="ghost" className="text-slate-400 hover:text-white">
-                        &larr; Back to Command Center
-                    </Button>
-                    <h2 className="text-xl font-bold text-white">{activeTool === 'chat' ? 'AI Assistant' : activeTool.charAt(0).toUpperCase() + activeTool.slice(1)}</h2>
-                </div>
-                {error && <p className="text-red-400 bg-red-900/20 border border-red-800 p-4 rounded-lg text-center mb-6">{error}</p>}
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    {renderToolUI()}
-                </motion.div>
-            </div>
-        );
-    }
-    
+    const handleAbort = () => {
+        setActiveTool('none');
+        setQuiz(null);
+        setFlashcards(null);
+        setSmartSummary(null);
+        setMindMapData(null);
+        setChatSession(null);
+        setError(null);
+    };
+
     return (
-        <div className="space-y-10">
-            {/* Header Section */}
-            <motion.div 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-violet-900/40 to-slate-900/40 border border-white/10 p-8 md:p-12 text-center backdrop-blur-sm"
-            >
-                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay"></div>
-                <div className="relative z-10">
-                    <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 mb-4">
-                        Command Center
-                    </h1>
-                    <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-8 leading-relaxed">
-                         Welcome back, <span className="text-violet-400 font-semibold">{userName || 'Student'}</span>. 
-                         {extractedText 
-                            ? <span> Content loaded: <span className="text-white font-bold">{subject} ({classLevel})</span>. All systems operational.</span>
-                            : " No data stream detected. Initialize a new session to activate tools."
-                        }
-                    </p>
-                    <Button onClick={resetContent} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white backdrop-blur-md">
-                        <AcademicCapIcon className="w-5 h-5"/>
-                        Initialize New Session
-                    </Button>
-                </div>
-            </motion.div>
+        <div className="max-w-[1600px] mx-auto px-6 space-y-12 pb-32">
+            {activeTool === 'none' ? (
+                <>
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-6 border-b border-white/5 pb-10">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                            <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase">STUBRO <span className="text-violet-500">HQ</span></h1>
+                            <p className="text-slate-500 font-mono-tech mt-2 tracking-widest uppercase">NODE: {userName} | SESSION: {sessionId?.substring(0,8)}</p>
+                        </motion.div>
+                        <Link to="/new-session">
+                            <Button size="lg" className="h-16 px-10 !bg-violet-600 shadow-xl">NEW NEURAL SESSION</Button>
+                        </Link>
+                    </div>
 
-            {/* Recent History Section */}
-            {recentHistory.length > 0 && (
-                <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="max-w-4xl mx-auto"
-                >
-                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <SparklesIcon className="w-5 h-5 text-yellow-400"/> Recent Memory
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {recentHistory.map((item: any) => (
-                            <Card key={item.id} variant="dark" className="!p-4 !bg-slate-800/50 border-slate-700">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-xs text-slate-400 uppercase font-bold">{item.type}</p>
-                                        <p className="text-sm font-medium text-white mt-1 truncate">{item.topic || item.title}</p>
-                                    </div>
-                                    <span className="text-[10px] text-slate-500">{new Date(item.timestamp?.seconds * 1000).toLocaleDateString()}</span>
-                                </div>
-                            </Card>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[...toolCategories[0].tools, ...toolCategories[1].tools].map(tool => (
+                            <motion.div key={tool.title} whileHover={{ y: -5 }} onClick={() => handleToolClick(tool)} className="cursor-pointer h-full">
+                                <Card variant="glass" className="h-full !p-8 hover:border-violet-500/50 group">
+                                    <div className={`w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center mb-6 ${tool.color} group-hover:scale-110 transition-transform`}><tool.icon className="w-8 h-8"/></div>
+                                    <h3 className="text-xl font-bold text-white mb-2">{tool.title}</h3>
+                                    <p className="text-slate-500 text-sm">{tool.description}</p>
+                                </Card>
+                            </motion.div>
                         ))}
                     </div>
-                </motion.div>
+                </>
+            ) : (
+                <div className="space-y-6">
+                    <Button onClick={handleAbort} variant="ghost" className="opacity-60 hover:opacity-100 font-black uppercase text-[10px] tracking-widest">&larr; ABORT MODULE & RETURN TO HQ</Button>
+                    <AnimatePresence mode="wait">
+                        <motion.div key={activeTool} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                            {isLoading ? (
+                                <div className="py-40 flex flex-col items-center gap-6 animate-in fade-in duration-700">
+                                    <Spinner className="w-20 h-20" colorClass="bg-violet-500"/>
+                                    <div className="text-center">
+                                        <p className="text-3xl font-black uppercase tracking-tighter text-white">{loadingMessage}</p>
+                                        <p className="text-slate-500 font-mono-tech text-[10px] uppercase mt-2 tracking-[0.4em]">Calibrating Neural core</p>
+                                    </div>
+                                </div>
+                            ) : error ? (
+                                <Card variant="dark" className="!p-20 text-center border-red-500/20 max-w-2xl mx-auto">
+                                    <p className="text-red-500 font-bold uppercase tracking-widest text-sm mb-4">{error}</p>
+                                    <Button onClick={handleAbort} variant="secondary">Reset</Button>
+                                </Card>
+                            ) : (
+                                <>
+                                    {activeTool === 'chat' && (
+                                        <Card variant="dark" className="h-[75vh] flex flex-col border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+                                            <div className="flex-grow p-8 space-y-6 overflow-y-auto bg-slate-950/30">
+                                                {chatHistory.map((msg, i) => (
+                                                    <div key={i} className={`flex items-start gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                                        <div className={`p-4 rounded-2xl ${msg.role === 'user' ? 'bg-violet-600/20 border border-violet-500/30 text-white' : 'bg-slate-900 border border-slate-800 text-slate-200'}`}>
+                                                            <MarkdownRenderer content={msg.text} />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <form onSubmit={async (e) => {
+                                                e.preventDefault();
+                                                if (!userMessage.trim() || !chatSession) return;
+                                                const msg = userMessage;
+                                                setUserMessage('');
+                                                const updated = [...chatHistory, { role: 'user', text: msg } as ChatMessage];
+                                                setChatHistory(updated);
+                                                const stream = await geminiService.sendMessageStream(chatSession, msg);
+                                                let response = '';
+                                                const historyWithSlot = [...updated, { role: 'model', text: '' } as ChatMessage];
+                                                setChatHistory(historyWithSlot);
+                                                for await (const chunk of stream) {
+                                                    response += chunk.text;
+                                                    setChatHistory(prev => {
+                                                        const h = [...prev];
+                                                        h[h.length - 1].text = response;
+                                                        return h;
+                                                    });
+                                                }
+                                                if (chatActivityId) await userService.updateActivity(chatActivityId, [...updated, { role: 'model', text: response }]);
+                                            }} className="p-6 bg-slate-900 border-t border-white/5 flex gap-4">
+                                                <input value={userMessage} onChange={e => setUserMessage(e.target.value)} placeholder="QUERY..." className="flex-grow bg-slate-950 border border-slate-700 p-4 rounded-2xl text-white font-mono text-xs" />
+                                                <Button type="submit" className="w-14 h-14 !p-0"><RocketLaunchIcon/></Button>
+                                            </form>
+                                        </Card>
+                                    )}
+                                    {activeTool === 'summary' && smartSummary && <SmartSummaryComponent summary={smartSummary} />}
+                                    {activeTool === 'quiz' && quiz && <QuizComponent questions={quiz} sourceText={extractedText} subject={subject!} />}
+                                    {activeTool === 'flashcards' && flashcards && <FlashcardComponent flashcards={flashcards} />}
+                                    {activeTool === 'mindmap' && mindMapData && <MindMap data={mindMapData} />}
+                                </>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
             )}
 
-            {/* Tool Grid */}
-            <div className="space-y-12">
-            {toolCategories.map((category, categoryIdx) => {
-                const filteredTools = category.tools.filter(tool => {
-                    if (!subject) return true; 
-                    if (!tool.subjects) return true; 
-                    return tool.subjects.includes(subject); 
-                });
-
-                if (filteredTools.length === 0) return null;
-
-                return (
-                    <motion.div 
-                        key={category.name}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: categoryIdx * 0.1 }}
-                    >
-                        <div className="flex items-center gap-4 mb-6">
-                            <h2 className="text-xl font-bold text-white tracking-wide uppercase">{category.name}</h2>
-                            <div className="h-[1px] flex-grow bg-gradient-to-r from-slate-700 to-transparent"></div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {filteredTools.map((tool, idx) => (
-                                <motion.div
-                                    key={tool.title}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: (categoryIdx * 0.1) + (idx * 0.05) }}
-                                >
-                                    <ToolCard tool={tool} />
-                                </motion.div>
-                            ))}
-                        </div>
-                    </motion.div>
-                );
-            })}
-            </div>
+            {showQuizSettings && (
+                 <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
+                     <Card variant="dark" className="max-w-md w-full !p-10 border-slate-700 shadow-2xl">
+                         <h3 className="text-2xl font-black text-white text-center mb-8 uppercase">Module Config</h3>
+                         <div className="space-y-8">
+                            <div>
+                                <div className="flex justify-between items-center mb-3">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Neural Depth</label>
+                                    <span className="text-violet-400 font-mono-tech font-bold">{quizQuestionCount}</span>
+                                </div>
+                                <input type="range" min="1" max="15" value={quizQuestionCount} onChange={e => setQuizQuestionCount(parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500" />
+                            </div>
+                            <div className="flex gap-4">
+                                <Button onClick={() => setShowQuizSettings(false)} variant="ghost" className="flex-1">ABORT</Button>
+                                <Button onClick={handleGenerateQuiz} className="flex-[2] h-14">INITIALIZE</Button>
+                            </div>
+                         </div>
+                     </Card>
+                 </div>
+            )}
         </div>
     );
 };

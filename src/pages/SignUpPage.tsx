@@ -5,6 +5,7 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import { useAuth } from '../contexts/AuthContext';
 import Spinner from '../components/common/Spinner';
+import { CLASS_LEVELS } from '../constants';
 
 const SignUpPage: React.FC = () => {
   const [name, setName] = useState('');
@@ -17,7 +18,7 @@ const SignUpPage: React.FC = () => {
   const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const REQUIRED_INVITE_CODE = "GARVBRO";
+  const REQUIRED_INVITE_CODE = "GARV";
   const isInviteValid = inviteCode.trim().toUpperCase() === REQUIRED_INVITE_CODE;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,7 +42,7 @@ const SignUpPage: React.FC = () => {
 
   const handleGoogleSignup = async () => {
     if (!isInviteValid) {
-        return setError('Unlock with Invite Code "GARVBRO" first to use Google Sign-up.');
+        return setError('Unlock with Invite Code "GARV" first to use Google Sign-up.');
     }
     setError('');
     setLoading(true);
@@ -82,7 +83,7 @@ const SignUpPage: React.FC = () => {
                 }} 
                 required 
                 className={`w-full px-4 py-4 border-2 rounded-2xl outline-none text-slate-900 font-black text-center tracking-[0.5em] transition-all ${isInviteValid ? 'bg-green-50 border-green-400' : 'bg-violet-500/5 border-violet-500/20 focus:border-violet-500'}`} 
-                placeholder="GARVBRO"
+                placeholder="GARV"
               />
               {isInviteValid && <p className="text-[9px] text-green-600 font-bold mt-1 uppercase tracking-widest text-center">Key Validated. Neural Link Ready.</p>}
             </div>

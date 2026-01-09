@@ -130,7 +130,7 @@ const VisualExplanationPage: React.FC = () => {
                  setSummaryStatus('error');
             }
 
-            // SAVE TO FIRESTORE ONCE DONE
+            /* FIX: Corrected argument order for saveActivity: (type, topic, subject, data) */
             if (currentScenes.length > 0) {
                 userService.saveActivity('visual_explanation', customTopic || "Visual Explanation", subject || 'General', {
                     scenes: currentScenes,
@@ -141,7 +141,7 @@ const VisualExplanationPage: React.FC = () => {
             isGenerating.current = false;
         };
         processQueue();
-    }, [topics, sourceText, language, classLevel]);
+    }, [topics, sourceText, language, classLevel, customTopic, subject, summaryVideoScenes]);
 
     const handleTopicSelect = (index: number) => {
         if (topics[index].status !== 'complete' || topicSceneStarts[index] === undefined) return;
@@ -167,7 +167,6 @@ const VisualExplanationPage: React.FC = () => {
         }
     };
 
-    // ... (Rest of render methods similar to existing, omitted for brevity unless changed) ...
     const renderSetup = () => (
         <Card variant="light" className="max-w-2xl mx-auto">
             <div className="text-center mb-8">
