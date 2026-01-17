@@ -2,12 +2,12 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { 
     QuizQuestion, Subject, ClassLevel, WrittenFeedback, QuestionPaper, 
-    Flashcard, QuizDifficulty, MindMapNode, SmartSummary, LearningPath
+    Flashcard, QuizDifficulty, MindMapNode, SmartSummary, LearningPath, CareerInfo, StudyPlan, GradedPaper
 } from "../types";
 import { auth as firebaseAuth } from "./firebase";
 
-// Always use process.env.API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+// FIX: Per guidelines, API key must be from process.env.API_KEY, not import.meta.env.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const STUBRO_PERSONALITY_PROMPT = `You are StuBro AI, an elite educational neural engine for students.
 **STRICT LANGUAGE RULE:** YOUR OUTPUT MUST BE 100% IN ENGLISH. NEVER USE CHINESE OR HINDI CHARACTERS.
@@ -36,6 +36,8 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, context: string): Promi
       promise.then((res) => { clearTimeout(timeoutId); resolve(res); }, (err) => { clearTimeout(timeoutId); reject(err); });
     });
 };
+
+// --- SHARED SCHEMAS ---
 
 const questionPaperSchema = {
     type: Type.OBJECT,
@@ -321,6 +323,228 @@ export const analyzeStudentPerformance = async (activityType: string, data: any)
 };
 
 /**
+ * Generates a full question paper based on study material.
+ */
+export const generateQuestionPaper = async (sourceText: string, numQuestions: number, questionTypes: string, difficulty: string, totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
+    const prompt = `STRICTLY ENGLISH. Create a question paper for ${subject || 'General Studies'}. 
+    Questions: ${numQuestions}, Types: ${questionTypes}, Difficulty: ${difficulty}, Total Marks: ${totalMarks}.
+    Provide model answers for each. Text:\n${sourceText}`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-pro-preview",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: questionPaperSchema
+        }
+    }), 180000, 'Question Paper');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Grades a student's answer sheet based on provided images and the original paper.
+ */
+export const gradeAnswerSheet = async (paperText: string, imageParts: any[]): Promise<GradedPaper> => {
+    const prompt = `STRICTLY ENGLISH. You are an examiner. Grade the attached answer sheet images based on this question paper and model answers:\n${paperText}. Return JSON.`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-pro-preview",
+        contents: { parts: [{ text: prompt }, ...imageParts] },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    totalMarksAwarded: { type: Type.NUMBER },
+                    overallFeedback: { type: Type.STRING },
+                    gradedQuestions: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                questionNumber: { type: Type.NUMBER },
+                                marksAwarded: { type: Type.NUMBER },
+                                studentAnswerTranscription: { type: Type.STRING },
+                                feedback: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        whatWasCorrect: { type: Type.STRING },
+                                        whatWasIncorrect: { type: Type.STRING },
+                                        suggestionForImprovement: { type: Type.STRING },
+                                    },
+                                    required: ['whatWasCorrect', 'whatWasIncorrect', 'suggestionForImprovement']
+                                }
+                            },
+                            required: ['questionNumber', 'marksAwarded', 'studentAnswerTranscription', 'feedback']
+                        }
+                    }
+                },
+                required: ['totalMarksAwarded', 'overallFeedback', 'gradedQuestions']
+            }
+        }
+    }), 300000, 'Grading');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Generates personalized career guidance for a student.
+ */
+export const generateCareerGuidance = async (interests: string, strengths: string, ambitions: string, financial: string, other: string): Promise<CareerInfo> => {
+    const prompt = `STRICTLY ENGLISH. Expert career counseling for Indian students. 
+    Interests: ${interests}, Strengths: ${strengths}, Ambitions: ${ambitions}, Financial: ${financial}, Other: ${other}. 
+    Provide diverse career paths with descriptions, subjects, top colleges, and roadmaps.`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    introduction: { type: Type.STRING },
+                    careerPaths: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                careerName: { type: Type.STRING },
+                                description: { type: Type.STRING },
+                                subjectsToFocus: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                roadmap: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: { stage: { type: Type.STRING }, focus: { type: Type.STRING }, examsToPrepare: { type: Type.ARRAY, items: { type: Type.STRING } } },
+                                        required: ['stage', 'focus']
+                                    }
+                                },
+                                topColleges: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                potentialGrowth: { type: Type.STRING },
+                            },
+                            required: ['careerName', 'description', 'subjectsToFocus', 'roadmap', 'potentialGrowth']
+                        }
+                    }
+                },
+                required: ['introduction', 'careerPaths']
+            }
+        }
+    }), 120000, 'Career Guidance');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Generates a detailed study plan for a specific goal.
+ */
+export const generateStudyPlan = async (goal: string): Promise<StudyPlan> => {
+    const prompt = `STRICTLY ENGLISH. Create a day-by-day study plan for goal: "${goal}". Return JSON.`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    plan: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: { day: { type: Type.NUMBER }, topic: { type: Type.STRING }, goal: { type: Type.STRING }, timeSlot: { type: Type.STRING } },
+                            required: ['day', 'topic', 'goal']
+                        }
+                    }
+                },
+                required: ['title', 'plan']
+            }
+        }
+    }), 60000, 'Study Plan');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Generates insightful viva questions for a topic and class level.
+ */
+export const generateVivaQuestions = async (topic: string, classLevel: ClassLevel, numQuestions: number): Promise<string[]> => {
+    const prompt = `STRICTLY ENGLISH. Generate ${numQuestions} insightful viva questions for ${classLevel} on topic: ${topic}. Return JSON array of strings.`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
+    }), 60000, 'Viva Questions');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Evaluates an audio viva answer.
+ */
+export const evaluateVivaAudioAnswer = async (question: string, audioPart: any): Promise<any> => {
+    const prompt = `STRICTLY ENGLISH. Transcribe and evaluate the spoken answer for: "${question}". Return JSON with transcription, feedback, and marksAwarded (out of 10).`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: { parts: [{ text: prompt }, audioPart] },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: { transcription: { type: Type.STRING }, feedback: { type: Type.STRING }, marksAwarded: { type: Type.NUMBER } },
+                required: ["transcription", "feedback", "marksAwarded"]
+            }
+        }
+    }), 120000, 'Audio Viva Evaluation');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Evaluates a text viva answer.
+ */
+export const evaluateVivaTextAnswer = async (question: string, answer: string): Promise<any> => {
+    const prompt = `STRICTLY ENGLISH. Evaluate the answer for: "${question}". Answer provided: "${answer}". Return JSON with transcription (echo the answer), feedback, and marksAwarded (out of 10).`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: { transcription: { type: Type.STRING }, feedback: { type: Type.STRING }, marksAwarded: { type: Type.NUMBER } },
+                required: ["transcription", "feedback", "marksAwarded"]
+            }
+        }
+    }), 60000, 'Text Viva Evaluation');
+    return JSON.parse(response.text);
+};
+
+/**
+ * Creates a live voice conversation session for clearing doubts.
+ */
+export const createLiveDoubtsSession = (topic: string, classLevel: ClassLevel): Chat => {
+    const systemInstruction = `${STUBRO_PERSONALITY_PROMPT}\n\nYou are a live tutor for ${classLevel}. Discuss: "${topic}". Be conversational and clear. Strictly ENGLISH.`;
+    return ai.chats.create({ model: "gemini-3-flash-preview", config: { systemInstruction } });
+};
+
+/**
+ * Transcribes and responds to user audio input in a live session.
+ */
+export const sendAudioForTranscriptionAndResponse = async (chat: Chat, audioPart: any): Promise<any> => {
+    const prompt = `STRICTLY ENGLISH. Transcribe user doubt and provide a helpful response. Return JSON.`;
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: { parts: [{ text: prompt }, audioPart] },
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: { transcription: { type: Type.STRING }, response: { type: Type.STRING } },
+                required: ['transcription', 'response']
+            }
+        }
+    }), 120000, "Audio Processing");
+    return JSON.parse(response.text);
+};
+
+/**
  * Breaks down source text into distinct topics for visual explanations.
  */
 export const breakdownTextIntoTopics = async (sourceText: string): Promise<{ title: string; content: string }[]> => {
@@ -334,10 +558,7 @@ export const breakdownTextIntoTopics = async (sourceText: string): Promise<{ tit
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        title: { type: Type.STRING },
-                        content: { type: Type.STRING }
-                    },
+                    properties: { title: { type: Type.STRING }, content: { type: Type.STRING } },
                     required: ["title", "content"]
                 }
             }
@@ -360,10 +581,7 @@ export const generateScenesForTopic = async (topicContent: string, language: str
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        narration: { type: Type.STRING },
-                        image_prompt: { type: Type.STRING }
-                    },
+                    properties: { narration: { type: Type.STRING }, image_prompt: { type: Type.STRING } },
                     required: ["narration", "image_prompt"]
                 }
             }
@@ -372,7 +590,6 @@ export const generateScenesForTopic = async (topicContent: string, language: str
     const blueprints = JSON.parse(response.text);
     const scenes = [];
     for (const bp of blueprints) {
-        // Use gemini-2.5-flash-image for image generation
         const imgRes = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: bp.image_prompt }] }
@@ -399,10 +616,7 @@ export const generateFullChapterSummaryVideo = async (sourceText: string, langua
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        narration: { type: Type.STRING },
-                        image_prompt: { type: Type.STRING }
-                    },
+                    properties: { narration: { type: Type.STRING }, image_prompt: { type: Type.STRING } },
                     required: ["narration", "image_prompt"]
                 }
             }
@@ -442,12 +656,7 @@ export const generateLearningPath = async (topic: string, subject: Subject, clas
                         type: Type.ARRAY,
                         items: {
                             type: Type.OBJECT,
-                            properties: {
-                                step: { type: Type.NUMBER },
-                                topic: { type: Type.STRING },
-                                goal: { type: Type.STRING },
-                                resources: { type: Type.ARRAY, items: { type: Type.STRING } }
-                            },
+                            properties: { step: { type: Type.NUMBER }, topic: { type: Type.STRING }, goal: { type: Type.STRING }, resources: { type: Type.ARRAY, items: { type: Type.STRING } } },
                             required: ['step', 'topic', 'goal', 'resources']
                         }
                     }
@@ -459,8 +668,11 @@ export const generateLearningPath = async (topic: string, subject: Subject, clas
     return JSON.parse(response.text);
 };
 
+/**
+ * Predicts probable exam questions based on material.
+ */
 export const predictExamPaper = async (sourceText: string, difficulty: string, totalMarks: number, subject: Subject | null): Promise<QuestionPaper> => {
-     const prompt = `STRICTLY ENGLISH. Predict potential exam questions for ${subject} based on this text. Total marks: ${totalMarks}, Difficulty: ${difficulty}. Return JSON for a full question paper. Text:\n${sourceText}`;
+    const prompt = `STRICTLY ENGLISH. Predict potential exam questions for ${subject || 'General studies'} based on this text. Marks: ${totalMarks}, Difficulty: ${difficulty}. Return JSON for a full paper. Text:\n${sourceText}`;
     const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
         model: "gemini-3-pro-preview",
         contents: prompt,
@@ -472,8 +684,11 @@ export const predictExamPaper = async (sourceText: string, difficulty: string, t
     return JSON.parse(response.text);
 };
 
+/**
+ * Finds 3-5 real-world applications for an academic concept.
+ */
 export const findRealWorldApplications = async (concept: string): Promise<any[]> => {
-    const prompt = `STRICTLY ENGLISH. Provide 3-5 real-world applications for the concept: ${concept}. Return JSON array with industry and description.`;
+    const prompt = `STRICTLY ENGLISH. Provide 3-5 real-world applications for: ${concept}. Return JSON array with industry and description.`;
     const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -484,10 +699,7 @@ export const findRealWorldApplications = async (concept: string): Promise<any[]>
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        industry: { type: Type.STRING },
-                        description: { type: Type.STRING }
-                    },
+                    properties: { industry: { type: Type.STRING }, description: { type: Type.STRING } },
                     required: ['industry', 'description']
                 }
             }
@@ -496,8 +708,11 @@ export const findRealWorldApplications = async (concept: string): Promise<any[]>
     return JSON.parse(response.text);
 };
 
+/**
+ * Generates simple analogies for a concept.
+ */
 export const generateAnalogies = async (concept: string): Promise<any[]> => {
-    const prompt = `STRICTLY ENGLISH. Provide 2-3 simple analogies for the concept: ${concept}. Return JSON array with analogy and explanation.`;
+    const prompt = `STRICTLY ENGLISH. Provide 2-3 simple analogies for: ${concept}. Return JSON array with analogy and explanation.`;
     const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -507,10 +722,7 @@ export const generateAnalogies = async (concept: string): Promise<any[]> => {
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        analogy: { type: Type.STRING },
-                        explanation: { type: Type.STRING }
-                    },
+                    properties: { analogy: { type: Type.STRING }, explanation: { type: Type.STRING } },
                     required: ['analogy', 'explanation']
                 }
             }
@@ -519,8 +731,11 @@ export const generateAnalogies = async (concept: string): Promise<any[]> => {
     return JSON.parse(response.text);
 };
 
+/**
+ * Designs a lab experiment for a subject and topic.
+ */
 export const generateLabExperiment = async (subject: Subject, topic: string, safetyLevel: string): Promise<any> => {
-     const prompt = `STRICTLY ENGLISH. Design a lab experiment for ${subject} on topic: ${topic}. Safety level: ${safetyLevel}. Return JSON.`;
+    const prompt = `STRICTLY ENGLISH. Design a lab experiment for ${subject} on: ${topic}. Safety: ${safetyLevel}. Return JSON.`;
     const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -529,9 +744,7 @@ export const generateLabExperiment = async (subject: Subject, topic: string, saf
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    experimentTitle: { type: Type.STRING },
-                    objective: { type: Type.STRING },
-                    hypothesis: { type: Type.STRING },
+                    experimentTitle: { type: Type.STRING }, objective: { type: Type.STRING }, hypothesis: { type: Type.STRING },
                     materials: { type: Type.ARRAY, items: { type: Type.STRING } },
                     procedure: { type: Type.ARRAY, items: { type: Type.STRING } },
                     safetyPrecautions: { type: Type.ARRAY, items: { type: Type.STRING } }
@@ -543,13 +756,19 @@ export const generateLabExperiment = async (subject: Subject, topic: string, saf
     return JSON.parse(response.text);
 };
 
+/**
+ * Creates a chat session for a historical figure.
+ */
 export const createHistoricalChatSession = (figure: string): Chat => {
-    const systemInstruction = `You are ${figure}. Respond strictly in character and in ENGLISH. Use LaTeX for any scientific concepts mentioned.`;
+    const systemInstruction = `You are ${figure}. Respond strictly in character and in ENGLISH. Use LaTeX for any scientific concepts.`;
     return ai.chats.create({ model: "gemini-3-flash-preview", config: { systemInstruction } });
 };
 
+/**
+ * Analyzes a literary text for themes, devices, and characters.
+ */
 export const analyzeLiteraryText = async (text: string): Promise<any> => {
-    const prompt = `STRICTLY ENGLISH. Analyze the following literary text. Return JSON with title, author, themes, literaryDevices, characterAnalysis, and overallSummary. Text:\n${text}`;
+    const prompt = `STRICTLY ENGLISH. Analyze the literary text provided. Return JSON. Text:\n${text}`;
     const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -558,9 +777,7 @@ export const analyzeLiteraryText = async (text: string): Promise<any> => {
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    title: { type: Type.STRING },
-                    author: { type: Type.STRING },
-                    themes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    title: { type: Type.STRING }, author: { type: Type.STRING }, themes: { type: Type.ARRAY, items: { type: Type.STRING } },
                     literaryDevices: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { device: { type: Type.STRING }, example: { type: Type.STRING } }, required: ['device', 'example'] } },
                     characterAnalysis: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { character: { type: Type.STRING }, analysis: { type: Type.STRING } }, required: ['character', 'analysis'] } },
                     overallSummary: { type: Type.STRING }
@@ -572,13 +789,19 @@ export const analyzeLiteraryText = async (text: string): Promise<any> => {
     return JSON.parse(response.text);
 };
 
+/**
+ * Creates a chat session for discussing ethical dilemmas.
+ */
 export const createDilemmaChatSession = (topic: string): Chat => {
-    const systemInstruction = `You are an ethics moderator. Present challenging dilemmas on ${topic} and facilitate critical thinking. Strictly in ENGLISH.`;
+    const systemInstruction = `Ethics moderator. Present challenging dilemmas on ${topic} and facilitate critical thinking. Strictly ENGLISH.`;
     return ai.chats.create({ model: "gemini-3-flash-preview", config: { systemInstruction } });
 };
 
+/**
+ * Explores a "What If" scenario in history.
+ */
 export const exploreWhatIfHistory = async (scenario: string): Promise<string> => {
-    const prompt = `STRICTLY ENGLISH. Explore the historical "What If" scenario: ${scenario}. Provide a logical, plausible alternate history based on historical principles.`;
+    const prompt = `STRICTLY ENGLISH. Explore historical "What If": ${scenario}. Use historical principles.`;
     const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
